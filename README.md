@@ -42,78 +42,80 @@ python3 IoT_MAB.py <nrNodes> <nrIntNodes> <nrBS> <initial> <radius> <distributio
 Example:
 
 ```python
-python3 IoT_MAB.py --nrNodes 5 --nrIntNodes 5 --nrBS 1 --initial UNIFORM --radius 2000 --distribution '0.1 0.1 0.3 0.4 0.05 0.05' --AvgSendTime 360000 --horizonTime 10  --packetLength 50 --freqSet '867300' --sfSet '7 8'  --powerSet "14"  --captureEffect 1  --interSFInterference 1 --infoMode NO --logdir logs --exp_name exp1
+python3 IoT_MAB.py --nrNodes 5 --nrIntNodes 5 --nrBS 1 --initial UNIFORM --radius 2000 --distribution '0.1 0.1 0.3 0.4 0.05 0.05' --AvgSendTime 360000 --horizonTime 10  --packetLength 50 --freqSet '867300' --sfSet '7 8'  --powerSet "14"  --captureEffect 1  --interSFInterference 1 --infoMode NO --algo 'exp3s' --logdir logs --exp_name exp1
 ```
 ### Description
 **nrNodes**
 
-number of nodes to simulate.
+Total number of end devices (nodes) to simulate in the network.
 
 **nrIntNodes**
 
-number of smart nodes to simulate. nrIntNodes must be smaller than nrNodes
+Number of intelligent (smart) nodes using learning-based algorithms. Must be less than or equal to `nrNodes`.
 
 **nrBS**
 
-number of base station.
+Number of LoRaWAN gateways (base stations) in the simulation.
 
 **initial**
 
-initial probability for learning process, which is *UNIFORM* for uniform distribution or *RANDOM* for random distribution.
+Initialization method for the learning algorithm's action probabilities. Use `UNIFORM` for equal probability distribution or `RANDOM` for random initialization.
 
 **radius**
 
-radius to simulate in metre.
+Radius (in meters) of the simulated network area. All nodes are placed within this circular region.
 
 **distribution**
 
-distribution of end-devices in the network
-Fraction of nodes to place in each region (should sum to 1.0).
-For example, [0.5, 0.3, 0.2] means 50% in region 1, 30% in region 2, etc.
+Proportion of nodes assigned to each region within the network. Values should sum to 1.0. For example, `0.5 0.3 0.2` means 50% of nodes in region 1, 30% in region 2, and 20% in region 3.
 
 **AvgSendTime**
 
-average sending interval in milliseconds.
+Average interval (in milliseconds) between consecutive transmissions from each node.
 
 **horizonTime**
 
-number of iteration to simulate. The simulation time is **horizonTime x AvgSendTime**
+Number of simulation cycles (iterations). The total simulated time is `horizonTime × AvgSendTime`.
 
 **packetLength**
 
-length of packet to simulate in bytes
+Size of each data packet (in bytes) sent by nodes.
 
 **sfSet**
 
-set of SF to simulate, must be between 7 and 12
+Set of Spreading Factors (SF) to be considered, specified as space-separated values between 7 and 12 (e.g., `7 8 9`).
 
 **freqSet**
 
-set of frequency to simulate.
+Set of carrier frequencies (in kHz) available for transmission, specified as space-separated values (e.g., `867300 868100`).
 
 **powerSet**
 
-set of power to simulate.
+Set of transmission power levels (in dBm) available to nodes, specified as space-separated values (e.g., `14 17`).
 
 **captureEffect**
 
-capture effect (power collision) or not.
+Enable (1) or disable (0) the capture effect, which allows a stronger signal to be received in the presence of interference.
 
 **interSFInterference**
 
-inter-sf interference.
+Enable (1) or disable (0) inter-spreading factor interference, which models imperfect orthogonality between different SFs.
 
 **infoMode**
 
-information mode to simulate.
+Level of information output during simulation. Options may include `NO`, `PARTIAL`, or `FULL` (refer to code for supported values).
+
+**algo**
+
+Specifies the learning algorithm used by intelligent nodes for resource allocation. Supported values include `exp3s`, `exp3`, and others as implemented in the code.
 
 **logdir**
 
-name of folder to store simulations.
+Directory name where simulation logs and output files will be stored.
 
 **exp_name**
 
-name of folder to store scenario.
+Name of the experiment/scenario, used to organize output files and results.
 
 ### Output
 
