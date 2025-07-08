@@ -225,8 +225,8 @@ class myNode():
         prob = prob/sum(prob)
         self.weight = {x: weight[x] for x in range(0, self.nrActions)}
         self.prob = {x: prob[x] for x in range(0, self.nrActions)}
-        print(f"[myNode updateProb] Updated weights: {self.weight}")
-        print(f"[myNode updateProb] Updated probs: {self.prob}")
+        # print(f"[myNode updateProb] Updated weights: {self.weight}")
+        # print(f"[myNode updateProb] Updated probs: {self.prob}")
 
     def resetACK(self):
         print(f"[myNode resetACK] nodeid={self.nodeid}")

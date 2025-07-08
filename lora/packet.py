@@ -99,7 +99,7 @@ class myPacket():
         self.sf, self.freq, self.pTX = self.setActions[self.choosenAction]
         print("[myPacket updateTXSettings] Node " + str(self.nodeid) + " chose action: " + str(self.choosenAction) + " with SF: " + str(self.sf) + ", Freq: " + str(self.freq) + ", pTX: " + str(self.pTX))
         self.pRX = getRXPower(self.pTX, self.dist, logDistParams)
-        print("[myPacket updateTXSettings] probability of node " +str(self.nodeid)+" is: " +str(self.prob))
+        # print("[myPacket updateTXSettings] probability of node " +str(self.nodeid)+" is: " +str(self.prob))
 
         self.signalLevel = self.computePowerDist(bsDict, logDistParams)
 

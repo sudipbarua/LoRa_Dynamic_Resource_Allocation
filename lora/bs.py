@@ -87,9 +87,9 @@ class myBS():
         -------
         """
         for fbucket in packet.signalLevel.keys():
-            print("[myBS addPacket] before-" + str(self.signalLevel[fbucket]))
+            # print("[myBS addPacket] before-" + str(self.signalLevel[fbucket]))
             self.signalLevel[fbucket] = self.signalLevel[fbucket] + packet.signalLevel[fbucket]
-            print("[myBS addPacket] after-" + str(self.signalLevel[fbucket]))
+            # print("[myBS addPacket] after-" + str(self.signalLevel[fbucket]))
             self.evaluateFreqBucket(fbucket)
             self.packetsInBucket[fbucket][nodeid] = packet
         self.packets[nodeid] = packet

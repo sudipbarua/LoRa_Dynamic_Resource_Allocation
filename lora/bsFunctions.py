@@ -51,8 +51,8 @@ def transmitPacket(env, node, bsDict, logDistParams, algo):
             bsDict[bsid].resetACK()
         
         print("[bsFunctions transmitPacket] Start transmitting packet at t= {}".format(int(1+env.now/(node.period))) + " from node {}".format(node.nodeid))
-        print(node.prob)
-        print(node.weight)
+        # print(node.prob)
+        # print(node.weight)
         for pkid in bsDict[bsid].packets.keys():    
             print(
                 f"packetId: {pkid}, sf: {bsDict[bsid].packets[pkid].sf}, "
@@ -96,9 +96,9 @@ def transmitPacket(env, node, bsDict, logDistParams, algo):
                     node.packetsSuccessful += 1
                     node.transmitTime += node.packets[0].rectime
             node.updateProb(algo)
-        print("[bsFunctions transmitPacket]Probability of action from node " +str(node.nodeid)+ " at (t+1)= {}".format(int(1+env.now/(6*60*1000))))
-        print(node.prob)
-        print(node.weight)
+        # print("[bsFunctions transmitPacket]Probability of action from node " +str(node.nodeid)+ " at (t+1)= {}".format(int(1+env.now/(6*60*1000))))
+        # print(node.prob)
+        # print(node.weight)
         # wait to next period
         yield env.timeout(float(node.period)-Tcritical-Trest-ACKrest)
         #input()
