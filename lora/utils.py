@@ -12,7 +12,7 @@ import numpy as np
 from os.path import join, exists
 from os import makedirs
 import simpy
-from .node import myNode
+from .node import myNode, rlNode
 from .bs import myBS
 from .bsFunctions import transmitPacket, cuckooClock, saveProb, saveRatio, saveEnergy, saveTraffic
 from .loratools import dBmTomW, getMaxTransmitDistance, placeRandomlyInRange, placeRandomly
@@ -171,8 +171,12 @@ def sim(nrNodes, nrIntNodes, nrBS, initial, radius, distribution, avgSendTime, h
         
     nodeDict = {} # setup empty dictionary for nodes
     for elem in nodeList:
-        node = myNode(int(elem[0]), (elem[1], elem[2]), elem[3:13], initial, sfSet, freqSet, powSet, 
-                    BSList, interferenceThreshold, logDistParams, sensi, elem[13], info_mode, horTime, algo, simu_dir, fname)
+        if algo=="exp3" or algo=="exp3s":
+            node = myNode(int(elem[0]), (elem[1], elem[2]), elem[3:13], initial, sfSet, freqSet, powSet,
+                          BSList, interferenceThreshold, logDistParams, sensi, elem[13], info_mode, horTime, algo, simu_dir, fname)
+        elif algo=="DDQN":
+            node = rlNode(int(elem[0]), (elem[1], elem[2]), elem[3:13], initial, sfSet, freqSet, powSet,
+                          BSList, interferenceThreshold, logDistParams, sensi, elem[13], info_mode, horTime, algo, simu_dir, fname)
         nodeDict[node.nodeid] = node
         env.process(transmitPacket(env, node, bsDict, logDistParams, algo))
     

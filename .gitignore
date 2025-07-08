@@ -94,6 +94,7 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+dy_adr/
 
 # Spyder project settings
 .spyderproject
@@ -112,3 +113,11 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+
+*.csv
+*.npy
+/.idea/inspectionProfiles/profiles_settings.xml
+/.idea/LoRa_Dynamic_Resource_Allocation.iml
+/.idea/misc.xml
+/.idea/modules.xml

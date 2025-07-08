@@ -45,26 +45,26 @@ if __name__ == '__main__':
     # # print args and run simulation
 
     args = SimpleNamespace(
-        nrNodes=5,
-        nrIntNodes=5,
+        nrNodes=100,
+        nrIntNodes=50,
         nrBS=1,
         initial='UNIFORM',
-        radius=3000,
-        distribution='.2 .2 .2 .2 .2',
-        AvgSendTime= 60*60*10e3,  # 15 minutes in ms
-        horizonTime=10000,
+        radius=4500,
+        distribution='0.1 0.1 0.3 0.4 0.05 0.05',
+        AvgSendTime= 1*60*10e3,  # 1 minutes in ms
+        horizonTime= 140000,
         packetLength=50,
-        # sfSet='7 8 9 10 11 12',  # Example spreading factors
-        sfSet='7 9 12',
-        # freqSet='868100 868300 868500',  # Example frequencies in kHz
-        freqSet='867300',
-        # powerSet='2 4 6 8 10 12 14',
-        powerSet='2 6 10 14',
+        sfSet='7 8 9 10 11 12',  # Example spreading factors
+        # sfSet='7 9 12',
+        freqSet='868100',  # Example frequencies in kHz
+        # freqSet='867300',
+        powerSet='2 4 6 8 10 12 14',  # Example power levels in dBm
+        # powerSet='2 6 10 14',
         captureEffect=1,
         interSFInterference=1,
         infoMode='FULL',  # NO, PARTIAL, FULL
         Algo='exp3s',
-        exp_name='test_exp',
-        logdir='./logs'
+        exp_name='sc2',
+        logdir='./exp3s_logs' 
     )
     main(args)

@@ -4,7 +4,7 @@ from collections import deque
 import tensorflow as tf
 from tensorflow.python.keras.models import Model
 from tensorflow.python.keras.layers import Dense, Input
-from tensorflow.python.keras.optimizers import Adam
+from tensorflow.keras.optimizers import Adam
 
 class LoRaDRL:
     def __init__(self, state_size, action_size, num_channels=1):

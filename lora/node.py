@@ -239,3 +239,32 @@ class myNode():
     def updateTXSettings(self):
         print(f"[myNode updateTXSettings] nodeid={self.nodeid}")
         pass
+
+
+class rlNode(myNode):
+    """ LPWAN Simulator: node
+    |category /LoRa
+    |keywords lora
+    
+    \param [IN] nodeid: id of the node
+    \param [IN] position: position of the node in format [x y]
+    \param [IN] transmitParams: physical layer's parameters
+    \param [IN] bsList: list of BS
+    \param [IN] interferenceThreshold: interference threshold
+    \param [IN] logDistParams: log shadowing channel parameters
+    \param [IN] sensi: sensitivity matrix
+    \param [IN] nSF: number of spreading factors
+    
+    """
+    def __init__(self, nodeid, position, transmitParams, initial, sfSet, freqSet, powSet, bsList,
+                 interferenceThreshold, logDistParams, sensi, node_mode, info_mode, horTime, algo, simu_dir, fname):
+        super().__init__(nodeid, position, transmitParams, initial, sfSet, freqSet, powSet,
+                         bsList, interferenceThreshold, logDistParams, sensi,
+                         node_mode, info_mode, horTime, algo, simu_dir, fname)
+        print(f"[ddqnNode __init__] Initialized ddqnNode with nodeid={self.nodeid}")
+
+    def generatePacketsToBS(self, transmitParams, logDistParams):
+        return super().generatePacketsToBS(transmitParams, logDistParams)
+    
+    def updateProb(self, algo):
+        return super().updateProb(algo)

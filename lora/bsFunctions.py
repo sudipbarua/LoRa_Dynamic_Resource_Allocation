@@ -42,8 +42,11 @@ def transmitPacket(env, node, bsDict, logDistParams, algo):
         
         # send a virtual packet to each base-station in range and those we may affect
         for bsid, dist in node.proximateBS.items():
-            prob_temp = [node.prob[x] for x in node.prob]
-            node.packets[bsid].updateTXSettings(bsDict, logDistParams, prob_temp)
+            if algo=="exp3" or algo=="exp3s": 
+                prob_temp = [node.prob[x] for x in node.prob]
+                node.packets[bsid].updateTXSettings(bsDict, logDistParams, prob_temp)
+            elif algo=="DDQN":
+                pass
             bsDict[bsid].addPacket(node.nodeid, node.packets[bsid])
             bsDict[bsid].resetACK()
         

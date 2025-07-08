@@ -151,3 +151,97 @@ class myPacket():
         signal[idx] = powermW
         #print(signal)
         return {freqBuckets[0]:signal}
+    
+
+class rlPacket(myPacket):
+    """ LPWAN Simulator: ddqnPacket
+    DDQN packet class, inherits from myPacket
+    
+    |category /LoRa
+    |keywords lora
+    
+    \param [IN] nodeid: id of the node
+    \param [IN] bsid: id of the base station
+    \param [IN] dist: distance between node and bs
+    \param [IN] transmitParams: physical layer parameters
+                [sf, rdd, bw, packetLength, preambleLength, syncLength, headerEnable, crc, pTX, period] 
+    \param [IN] logDistParams: log shadowing channel parameters
+    \param [IN] sensi: sensitivity matrix
+    \param [IN] setActions: set of possible actions
+    \param [IN] nrActions: number of actions
+    \param [IN] sfSet: set of spreading factors
+    \param [IN] prob: probability
+    """
+    
+    def __init__(self, nodeid, bsid, dist, transmitParams, logDistParams, sensi, setActions, nrActions, sfSet, prob):
+        self.nodeid = nodeid
+        self.bsid = bsid
+        self.dist = dist
+        
+        # params
+        self.sf = int(transmitParams[0])
+        self.rdd = int(transmitParams[1])
+        self.bw = int(transmitParams[2])
+        self.packetLength = int(transmitParams[3])
+        self.preambleLength = int(transmitParams[4])
+        self.syncLength = transmitParams[5]
+        self.headerEnable = int(transmitParams[6])
+        self.crc = int(transmitParams[7])
+        self.pTXmax = int(transmitParams[8])
+        self.sensi = sensi
+        self.sfSet = sfSet
+        
+        # learn strategy
+        self.setActions = setActions
+        self.nrActions = nrActions
+        self.prob = [prob[x] for x in prob]
+        #self.choosenAction = choosenAction
+        #self.sf, self.freq, self.pTX = self.setActions[self.choosenAction]
+        self.sf = None
+        self.freq= None
+        self.pTX = self.pTXmax
+        
+        #received params
+        self.rectime = airtime(transmitParams[0:8])
+        self.pRX = getRXPower(self.pTX, self.dist, logDistParams)
+        self.signalLevel = None
+
+        # measurement params
+        self.packetNumber = 0
+        self.isLost = False
+        self.isCritical = False
+        self.isCollision = False
+
+    def updateTXSettings(self, bsDict, logDistParams, prob):
+        """ Update the TX settings after frequency hopping.
+        Parameters
+        ----------
+        bsDict: dictionary
+            Dictionary of BSs
+        logDistParams: list
+            Channel parameters, e.x., log-shadowing model: (gamma, Lpld0, d0)]
+        
+        Returns
+        isLost: bool
+            Packet is lost ot not by compare the pRX with RSSI
+        -------
+    
+        """
+        self.packetNumber += 1
+        self.prob = prob
+        self.choosenAction = random.choice(self.nrActions, p=self.prob)
+        self.sf, self.freq, self.pTX = self.setActions[self.choosenAction]
+        print("[myPacket updateTXSettings] Node " + str(self.nodeid) + " chose action: " + str(self.choosenAction) + " with SF: " + str(self.sf) + ", Freq: " + str(self.freq) + ", pTX: " + str(self.pTX))
+        self.pRX = getRXPower(self.pTX, self.dist, logDistParams)
+        print("[myPacket updateTXSettings] probability of node " +str(self.nodeid)+" is: " +str(self.prob))
+
+        self.signalLevel = self.computePowerDist(bsDict, logDistParams)
+
+        if self.pRX >= self.sensi[self.sf-7, 1+int(self.bw/250)]:
+            self.isLost = False
+        else:
+            self.isLost = True
+            print("[myPacket updateTXSettings] pRX", self.pRX)
+            print("[myPacket updateTXSettings] Node " + str(self.nodeid) + ": packet is lost (smaller than RSSI)!")
+   
+        self.isCritical = False
