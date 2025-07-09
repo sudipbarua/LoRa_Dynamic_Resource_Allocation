@@ -30,7 +30,7 @@ def main(args):
     
     assert initial in ["UNIFORM", "RANDOM"], "Initial mode must be UNIFORM, RANDOM."
     assert info_mode in ["NO", "PARTIAL", "FULL"], "Initial mode must be NO, PARTIAL, or FULL."
-    assert algo in ["exp3", "exp3s"], "Learning algorithm must be exp3 or exp3s."
+    assert algo in ["exp3", "exp3s", "DDQN"], "Learning algorithm must be exp3 or exp3s."
     
     
     # running simulation
@@ -45,26 +45,28 @@ if __name__ == '__main__':
     # # print args and run simulation
 
     args = SimpleNamespace(
-        nrNodes=100,
-        nrIntNodes=50,
+        nrNodes=10,
+        nrIntNodes=10,
         nrBS=1,
         initial='UNIFORM',
         radius=4500,
-        distribution='0.1 0.1 0.3 0.4 0.05 0.05',
+        distribution='0.1 0.1 0.4 0.3 0.1',
+        # distribution='0.2 0.2 0.2 0.2 0.1 0.1',
+        # distribution='1', 
         AvgSendTime= 1*60*10e3,  # 1 minutes in ms
-        horizonTime= 140000,
+        horizonTime= 14000,
         packetLength=50,
         sfSet='7 8 9 10 11 12',  # Example spreading factors
         # sfSet='7 9 12',
-        freqSet='868100',  # Example frequencies in kHz
+        freqSet='868100 868300 868500',  # Example frequencies in kHz
         # freqSet='867300',
-        powerSet='2 4 6 8 10 12 14',  # Example power levels in dBm
+        powerSet='14',  # Example power levels in dBm
         # powerSet='2 6 10 14',
         captureEffect=1,
         interSFInterference=1,
         infoMode='FULL',  # NO, PARTIAL, FULL
-        Algo='exp3s',
-        exp_name='sc2',
-        logdir='./exp3s_logs' 
+        Algo='isdjl',
+        exp_name='exp1',
+        logdir='./all_eperiments/500nodesR4-5km' 
     )
     main(args)

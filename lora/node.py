@@ -1,7 +1,8 @@
 from __future__ import division
 import numpy as np
 from .loratools import getDistanceFromPower
-from .packet import myPacket
+from .packet import myPacket, rlPacket
+from Agent import LoRaDRL
 
 class myNode():
     """ LPWAN Simulator: node
@@ -23,7 +24,7 @@ class myNode():
     def __init__(self, nodeid, position, transmitParams, initial, sfSet, freqSet, powSet, bsList,
                  interferenceThreshold, logDistParams, sensi, node_mode, info_mode, horTime, algo, simu_dir, fname):
         print(f"[myNode __init__] nodeid={nodeid}, position={position}, node_mode={node_mode}, info_mode={info_mode}, algo={algo}")
-        print(f"[myNode __init__] transmitParams: {transmitParams}, bsList: {bsList}, interferenceThreshold: {interferenceThreshold}, logDistParams: {logDistParams}, sensi: {sensi}")
+        # print(f"[myNode __init__] transmitParams: {transmitParams}, bsList: {bsList}, interferenceThreshold: {interferenceThreshold}, logDistParams: {logDistParams}, sensi: {sensi}")
         self.nodeid = nodeid # id
         self.x, self.y = position # location
         if node_mode == 0:
@@ -258,13 +259,33 @@ class rlNode(myNode):
     """
     def __init__(self, nodeid, position, transmitParams, initial, sfSet, freqSet, powSet, bsList,
                  interferenceThreshold, logDistParams, sensi, node_mode, info_mode, horTime, algo, simu_dir, fname):
-        super().__init__(nodeid, position, transmitParams, initial, sfSet, freqSet, powSet,
-                         bsList, interferenceThreshold, logDistParams, sensi,
-                         node_mode, info_mode, horTime, algo, simu_dir, fname)
-        print(f"[ddqnNode __init__] Initialized ddqnNode with nodeid={self.nodeid}")
+        
+        # initialize LoRaDRL agent
+        self.loraDlr = LoRaDRL(state_size=10, action_size=len(sfSet)*len(freqSet)*len(powSet), sfSet=sfSet, powSet=powSet, freqSet=freqSet)
+        self.learning_rate = self.loraDlr.learning_rate
+        self.alpha = self.loraDlr.alpha  # hyperparameter for tuning PDR impact on reward
+        
+        super().__init__(nodeid, position, transmitParams, initial, sfSet, freqSet, powSet, bsList,
+                         interferenceThreshold, logDistParams, sensi, node_mode, info_mode, horTime, algo, simu_dir, fname)
 
     def generatePacketsToBS(self, transmitParams, logDistParams):
-        return super().generatePacketsToBS(transmitParams, logDistParams)
+        """ Generate dictionary of base-stations in proximity.
+        Parameters
+        ----------
+        transmitParams : list
+            Transmission parameters.
+        logDistParams: list
+            Channel parameters
+        Returns
+        -------
+        packets: packet
+            packets at BS
+        """
+        packets = {} # empty dictionary to store packets originating at a node
+        for bsid, dist in self.proximateBS.items():
+            packets[bsid] = rlPacket(self.nodeid, bsid, dist, transmitParams, logDistParams, self.sensi, self.setActions, self.nrActions, self.sfSet, agent=self.loraDlr)
+        print(f"[rlNode generatePacketsToBS] Packets generated: {packets}")
+        return packets
     
     def updateProb(self, algo):
-        return super().updateProb(algo)
+        pass

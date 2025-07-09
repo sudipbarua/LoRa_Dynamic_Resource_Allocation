@@ -95,7 +95,10 @@ def transmitPacket(env, node, bsDict, logDistParams, algo):
                 if not node.ack[0].isCollision:
                     node.packetsSuccessful += 1
                     node.transmitTime += node.packets[0].rectime
-            node.updateProb(algo)
+            if algo=='exp3' or algo=='exp3s':
+                node.updateProb(algo)
+            elif algo=='DDQN':
+                pass
         # print("[bsFunctions transmitPacket]Probability of action from node " +str(node.nodeid)+ " at (t+1)= {}".format(int(1+env.now/(6*60*1000))))
         # print(node.prob)
         # print(node.weight)

@@ -4,37 +4,35 @@ from collections import deque
 import tensorflow as tf
 from tensorflow.python.keras.models import Model
 from tensorflow.python.keras.layers import Dense, Input
-from tensorflow.keras.optimizers import Adam
+from tensorflow.python.keras.optimizers import Adam
 
 class LoRaDRL:
-    def __init__(self, state_size, action_size, num_channels=1):
+    def __init__(self, state_size, action_size, sfSet, powSet, freqSet):
         self.state_size = state_size  
         self.action_size = action_size  
-        self.num_channels = num_channels
+        self.num_channels = len(freqSet)
 
         
-        self.gamma = 0.7  
+        self.gamma = 0.7   # discount factor for future rewards
         self.epsilon = 1.0  
         self.epsilon_min = 0.05
         self.epsilon_decay = 0.00005
         self.learning_rate = 0.0005
         self.batch_size = 128
         self.memory = deque(maxlen=30000)
-
         
         self.model = self._build_model()
         self.target_model = self._build_model()
         self.update_target_model()
 
         
-        self.SF_values = [7, 8, 9, 10, 11, 12]
-        self.power_levels = [2, 5, 8, 11, 14, 17, 20]  
-        self.channels = list(range(num_channels))
-
-        
-        self.alpha = 1.0  
-        self.beta = 0.5   
-        self.gamma_p = 0.3 
+        self.SF_values = sfSet
+        self.power_levels = powSet  
+        self.channels = freqSet
+        # Relative constants for assigning weights to different components of the reward function
+        self.alpha = 1.0   # hyperparameter for tuning PDR
+        self.beta = 0.5   # hyperparameter for tuning airtime
+        self.gamma_p = 0.3   # hyperparameter for tuning power usage
 
     def _build_model(self):
         inputs = Input(shape=(self.state_size,))
