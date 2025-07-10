@@ -2,9 +2,9 @@ import numpy as np
 import random
 from collections import deque
 import tensorflow as tf
-from tensorflow.python.keras.models import Model
-from tensorflow.python.keras.layers import Dense, Input
-from tensorflow.python.keras.optimizers import Adam
+from tensorflow.keras.models import Model
+from tensorflow.keras.layers import Dense, Input
+from tensorflow.keras.optimizers import Adam
 
 class LoRaDRL:
     def __init__(self, state_size, action_size, sfSet, powSet, freqSet):
@@ -41,7 +41,7 @@ class LoRaDRL:
         outputs = Dense(self.action_size, activation='linear')(x)
 
         model = Model(inputs=inputs, outputs=outputs)
-        model.compile(loss='mse', optimizer=Adam(lr=self.learning_rate))
+        model.compile(loss='mse', optimizer=Adam(learning_rate=self.learning_rate))  # The correct keyword for learning rate declaration now is learning_rate
         return model
 
     def update_target_model(self):
@@ -83,14 +83,15 @@ class LoRaDRL:
         if self.epsilon > self.epsilon_min:
             self.epsilon -= self.epsilon_decay
 
-    def calculate_reward(self, PDR, airtime, power_chosen):
+    def calculate_reward(self, PDR, airtime, power_chosen=0):
         power_max = max(self.power_levels)
         power_min = min(self.power_levels)
-        power_reward = (power_max - power_chosen) / (power_max - power_min)
+        # power_reward = (power_max - power_chosen) / (power_max - power_min)
 
-        reward = (self.alpha * PDR -
-                 self.beta * airtime +
-                 self.gamma_p * power_reward)
+        # reward = (self.alpha * PDR -
+        #          self.beta * airtime +
+        #          self.gamma_p * power_reward)
+        reward = (self.alpha * PDR - self.beta * airtime)
 
         return reward
 

@@ -2,7 +2,7 @@ from __future__ import division
 import numpy as np
 from .loratools import getDistanceFromPower
 from .packet import myPacket, rlPacket
-from Agent import LoRaDRL
+from .Agent import LoRaDRL
 
 class myNode():
     """ LPWAN Simulator: node
@@ -78,8 +78,8 @@ class myNode():
         else:
             prob = (1/self.nrActions) * np.ones(self.nrActions)
         self.prob = {x: prob[x] for x in range(0, self.nrActions)}
-        print(f"[myNode __init__] Initial weights: {self.weight}")
-        print(f"[myNode __init__] Initial probs: {self.prob}")
+        # print(f"[myNode __init__] Initial weights: {self.weight}")
+        # print(f"[myNode __init__] Initial probs: {self.prob}")
 
         # generate packet and ack
         self.packets = self.generatePacketsToBS(transmitParams, logDistParams)
@@ -261,10 +261,10 @@ class rlNode(myNode):
                  interferenceThreshold, logDistParams, sensi, node_mode, info_mode, horTime, algo, simu_dir, fname):
         
         # initialize LoRaDRL agent
-        self.loraDlr = LoRaDRL(state_size=10, action_size=len(sfSet)*len(freqSet)*len(powSet), sfSet=sfSet, powSet=powSet, freqSet=freqSet)
-        self.learning_rate = self.loraDlr.learning_rate
-        self.alpha = self.loraDlr.alpha  # hyperparameter for tuning PDR impact on reward
-        
+        self.loraDrlAgent = LoRaDRL(state_size=10, action_size=len(sfSet)*len(freqSet)*len(powSet), sfSet=sfSet, powSet=powSet, freqSet=freqSet)
+        self.learning_rate = self.loraDrlAgent.learning_rate
+        self.alpha = self.loraDrlAgent.alpha  # hyperparameter for tuning PDR impact on reward
+        self.targetUpdateInterval = 100  # update target model every 100 steps
         super().__init__(nodeid, position, transmitParams, initial, sfSet, freqSet, powSet, bsList,
                          interferenceThreshold, logDistParams, sensi, node_mode, info_mode, horTime, algo, simu_dir, fname)
 
@@ -283,9 +283,28 @@ class rlNode(myNode):
         """
         packets = {} # empty dictionary to store packets originating at a node
         for bsid, dist in self.proximateBS.items():
-            packets[bsid] = rlPacket(self.nodeid, bsid, dist, transmitParams, logDistParams, self.sensi, self.setActions, self.nrActions, self.sfSet, agent=self.loraDlr)
+            packets[bsid] = rlPacket(self.nodeid, bsid, dist, transmitParams, logDistParams, self.sensi, self.setActions, self.nrActions, self.sfSet, agent=self.loraDrlAgent)
         print(f"[rlNode generatePacketsToBS] Packets generated: {packets}")
         return packets
     
-    def updateProb(self, algo):
-        pass
+    def updateAgent(self):
+        # calculate PDR only after 5 packets have been transmitted
+        pdr = self.packetsSuccessful / self.packetsTransmitted if self.packetsTransmitted > 5 else 0
+        reward = self.loraDrlAgent.calculate_reward(pdr, self.packets[0].rectime)  # PDR airtime and power usage  
+        next_state = None
+        done = False  # Assuming the episode is not done yet
+        state = None
+
+        self.loraDrlAgent.remember(state, self.packets[0].chosenAction, reward, next_state, done)
+        self.loraDrlAgent.replay()  # Train the agent with the replay memory
+        # Update target model when the number of successful packets reaches the target update interval
+        if self.packetsSuccessful % self.targetUpdateInterval == 0: 
+            self.loraDrlAgent.update_target_model()
+            print(f"[{self.__class__.__name__} updateAgent] Updated target model at packetsSuccessful={self.packetsSuccessful}")
+
+        # # Update target model when the number of total tranmitted packets reaches the target update interval
+        # if self.packetsTransmitted % self.targetUpdateInterval == 0: 
+        #     self.loraDrlAgent.update_target_model()
+        #    print(f"[{self.__class__.__name__} updateAgent] Updated target model at packetsTransmitted={self.packetsTransmitted}")
+
+    # def 

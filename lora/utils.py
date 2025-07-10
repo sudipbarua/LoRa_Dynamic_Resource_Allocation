@@ -158,7 +158,7 @@ def sim(nrNodes, nrIntNodes, nrBS, initial, radius, distribution, avgSendTime, h
     print ("# nodes = {}".format(nrNodes))
     
     # Plotting - location
-    plotLocations(BSLoc, nodeLoc, grid[0], grid[1], bestDist, distMatrix)
+    # plotLocations(BSLoc, nodeLoc, grid[0], grid[1], bestDist, distMatrix)
 
     env = simpy.Environment()
     env.process(cuckooClock(env))

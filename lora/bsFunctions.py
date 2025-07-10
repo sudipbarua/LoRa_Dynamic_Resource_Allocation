@@ -47,6 +47,7 @@ def transmitPacket(env, node, bsDict, logDistParams, algo):
                 node.packets[bsid].updateTXSettings(bsDict, logDistParams, prob_temp)
             elif algo=="DDQN":
                 pass
+                node.loraDrlAgent
             bsDict[bsid].addPacket(node.nodeid, node.packets[bsid])
             bsDict[bsid].resetACK()
         
@@ -98,7 +99,7 @@ def transmitPacket(env, node, bsDict, logDistParams, algo):
             if algo=='exp3' or algo=='exp3s':
                 node.updateProb(algo)
             elif algo=='DDQN':
-                pass
+                node.updateAgent()
         # print("[bsFunctions transmitPacket]Probability of action from node " +str(node.nodeid)+ " at (t+1)= {}".format(int(1+env.now/(6*60*1000))))
         # print(node.prob)
         # print(node.weight)

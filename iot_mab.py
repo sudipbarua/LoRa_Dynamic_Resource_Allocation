@@ -65,7 +65,7 @@ if __name__ == '__main__':
         captureEffect=1,
         interSFInterference=1,
         infoMode='FULL',  # NO, PARTIAL, FULL
-        Algo='isdjl',
+        Algo='exp3s',
         exp_name='exp1',
         logdir='./all_eperiments/500nodesR4-5km' 
     )

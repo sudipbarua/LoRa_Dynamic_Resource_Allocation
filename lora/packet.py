@@ -173,7 +173,7 @@ class rlPacket(myPacket):
     \param [IN] prob: probability
     """
     
-    def __init__(self, nodeid, bsid, dist, transmitParams, logDistParams, sensi, setActions, nrActions, sfSet, agent, prob=None):
+    def __init__(self, nodeid, bsid, dist, transmitParams, logDistParams, sensi, setActions, nrActions, sfSet, agent, prob={'dummy': 'dummy'}):
         super().__init__(nodeid, bsid, dist, transmitParams, logDistParams, sensi, setActions, nrActions, sfSet, prob)
         self.agent = agent  # Store reference to LoRaDRL
 
@@ -194,6 +194,7 @@ class rlPacket(myPacket):
         """
         self.packetNumber += 1
         ############################## change here ##############################
+        # how are we goin thto choose the action?
         self.choosenAction = None
         self.sf, self.freq, self.pTX = self.setActions[self.choosenAction]
         ###########################################################################
