@@ -46,8 +46,13 @@ def transmitPacket(env, node, bsDict, logDistParams, algo):
                 prob_temp = [node.prob[x] for x in node.prob]
                 node.packets[bsid].updateTXSettings(bsDict, logDistParams, prob_temp)
             elif algo=="DDQN":
-                pass
-                node.loraDrlAgent
+                # in case of DQN, the choice of action depends on the (previous) states 
+                # So this is where we pass the preceding state information to the agent via the packet object
+                if node.packetNumber == 1:
+                    # sending the initial packet with random SF, Tx power=14, and random frequency
+                    node.packets[bsid].updateTXSettings(bsDict, logDistParams, None, init_packet=True)
+                else:
+                    node.packets[bsid].updateTXSettings(bsDict, logDistParams, node.statesHistory[-1], init_packet=False)
             bsDict[bsid].addPacket(node.nodeid, node.packets[bsid])
             bsDict[bsid].resetACK()
         

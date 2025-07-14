@@ -65,6 +65,7 @@ class myBS():
         self.signalLevel = {}
 
         self.sfSet = sfSet
+        self.freqSet = freqSet
         for freq in freqSet:
             self.packetsInBucket[freq] = {}
             self.signalLevel[freq] = np.zeros((6,1))

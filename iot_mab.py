@@ -65,8 +65,8 @@ if __name__ == '__main__':
         captureEffect=1,
         interSFInterference=1,
         infoMode='FULL',  # NO, PARTIAL, FULL
-        Algo='exp3s',
+        Algo='DDQN',  # exp3, exp3s, DDQN
         exp_name='exp1',
-        logdir='./all_eperiments/500nodesR4-5km' 
+        logdir='./all_eperiments/testingDDQN' 
     )
     main(args)

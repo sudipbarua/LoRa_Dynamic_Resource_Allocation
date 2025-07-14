@@ -267,6 +267,10 @@ class rlNode(myNode):
         self.targetUpdateInterval = 100  # update target model every 100 steps
         super().__init__(nodeid, position, transmitParams, initial, sfSet, freqSet, powSet, bsList,
                          interferenceThreshold, logDistParams, sensi, node_mode, info_mode, horTime, algo, simu_dir, fname)
+        # Storing the last 'n' states of a node 
+        self.rssiHistory = []  # Store RSSI history for the node
+        # self.snrHistory = []  # Store SNR history for the node
+        self.statesHistory = [[-70, 0.5, 50, 1.0]]  # Initial state: [RSSI, PRR, airtime, battery level]
 
     def generatePacketsToBS(self, transmitParams, logDistParams):
         """ Generate dictionary of base-stations in proximity.
@@ -289,13 +293,17 @@ class rlNode(myNode):
     
     def updateAgent(self):
         # calculate PDR only after 5 packets have been transmitted
-        pdr = self.packetsSuccessful / self.packetsTransmitted if self.packetsTransmitted > 5 else 0
-        reward = self.loraDrlAgent.calculate_reward(pdr, self.packets[0].rectime)  # PDR airtime and power usage  
-        next_state = None
-        done = False  # Assuming the episode is not done yet
-        state = None
+        prr = self.packetsSuccessful / self.packetsTransmitted if self.packetsTransmitted > 5 else 0
+        reward = self.loraDrlAgent.calculate_reward(prr, self.packets[0].rectime)  # PDR airtime and power usage  
+        prev_state = self.statesHistory[-1]  # get the last state from the history
+        current_state = self.get_network_state()
 
-        self.loraDrlAgent.remember(state, self.packets[0].chosenAction, reward, next_state, done)
+        if self.get_battery_level() <= 0:
+            done = True  # Episode is done if battery is empty
+        else:
+            done = False  # Assuming the episode is not done yet
+
+        self.loraDrlAgent.remember(prev_state, self.packets[0].chosenAction, reward, current_state, done)
         self.loraDrlAgent.replay()  # Train the agent with the replay memory
         # Update target model when the number of successful packets reaches the target update interval
         if self.packetsSuccessful % self.targetUpdateInterval == 0: 
@@ -307,4 +315,33 @@ class rlNode(myNode):
         #     self.loraDrlAgent.update_target_model()
         #    print(f"[{self.__class__.__name__} updateAgent] Updated target model at packetsTransmitted={self.packetsTransmitted}")
 
-    # def 
+    def get_network_state(self):
+        """ Get the current state of the network.
+        Returns
+        -------
+        state: np.array
+            Current state of the network.
+        """
+        rssi = self.packets[0].pRX  # RSSI of the packet
+        # snr = self.packets[0].snr  # SNR of the packet
+        prr = self.packetsSuccessful / self.packetsTransmitted if self.packetsTransmitted > 0 else 0  # Packet Reception Rate
+        airtime = self.packets[0].rectime  # Airtime of the packet
+        self.battery_level = self.get_battery_level()
+        state = [rssi, prr, airtime, self.battery_level]  
+        self.statesHistory.append(state)  # Store the state in the history
+        self.rssiHistory.append(rssi)  # Store the RSSI in the history
+        # self.snrHistory.append(snr)  # Store the SNR in the history
+        return state
+
+    def get_battery_level(self):
+        """ Get the current battery level of the node.
+        Returns
+        -------
+        battery_level: float
+            Current battery level of the node.
+        """
+        # Assuming a AA battery with 2500 mAh suppying constantly at 3.7V 
+        # The battery capacity in Joules is 2500 mAh * 3.7V = 9250 mWh = 33,300 J
+        battery_capacity = 33300  # in Joules
+        remaining_energy = battery_capacity - self.energy * 10e-3 # Remaining energy in Joules
+        return remaining_energy / battery_capacity  # Return the battery level as a fraction of the total capacity

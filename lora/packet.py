@@ -175,9 +175,9 @@ class rlPacket(myPacket):
     
     def __init__(self, nodeid, bsid, dist, transmitParams, logDistParams, sensi, setActions, nrActions, sfSet, agent, prob={'dummy': 'dummy'}):
         super().__init__(nodeid, bsid, dist, transmitParams, logDistParams, sensi, setActions, nrActions, sfSet, prob)
-        self.agent = agent  # Store reference to LoRaDRL
+        self.agent = agent  # Reference to the RL agent from RL node 
 
-    def updateTXSettings(self, bsDict, logDistParams):
+    def updateTXSettings(self, bsDict, logDistParams, state, init_packet):  # add state parameters like rssiHistory, snrHistory
         """ Update the TX settings after frequency hopping.
         Parameters
         ----------
@@ -193,14 +193,16 @@ class rlPacket(myPacket):
     
         """
         self.packetNumber += 1
-        ############################## change here ##############################
-        # how are we goin thto choose the action?
-        self.choosenAction = None
-        self.sf, self.freq, self.pTX = self.setActions[self.choosenAction]
-        ###########################################################################
-        print(f"[{self.__class__.__name__} updateTXSettings] Node " + str(self.nodeid) + " chose action: " + str(self.choosenAction) + " with SF: " + str(self.sf) + ", Freq: " + str(self.freq) + ", pTX: " + str(self.pTX))
+        if init_packet:
+            # Choosing random SF, Tx power=max Tx power, and random frequency for the initial packet
+            self.sf = random.choice(self.sfSet)
+            self.freq = random.choice([x for x in bsDict[self.bsid].freqSet if x != 0])  # Avoid zero frequency
+            self.pTX = self.pTXmax
+        else:
+            self.choosenAction = self.agent.act(state)
+            self.sf, self.freq, self.pTX = self.setActions[self.choosenAction]
+            print(f"[{self.__class__.__name__} updateTXSettings] Node " + str(self.nodeid) + " chose action: " + str(self.choosenAction) + " with SF: " + str(self.sf) + ", Freq: " + str(self.freq) + ", pTX: " + str(self.pTX))
         self.pRX = getRXPower(self.pTX, self.dist, logDistParams)
-        print(f"[{self.__class__.__name__} updateTXSettings] probability of node " +str(self.nodeid)+" is: " +str(self.prob))
 
         self.signalLevel = self.computePowerDist(bsDict, logDistParams)
 

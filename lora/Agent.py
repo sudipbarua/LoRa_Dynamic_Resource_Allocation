@@ -67,7 +67,7 @@ class LoRaDRL:
         rewards = np.array([i[2] for i in minibatch])
         next_states = np.array([i[3] for i in minibatch])
         dones = np.array([i[4] for i in minibatch])
-
+        
         current_q = self.model.predict(states)
 
         future_q = self.target_model.predict(next_states)
@@ -112,3 +112,54 @@ class LoRaDRL:
 
     def save(self, name):
         self.model.save_weights(name)
+
+
+########## test script ##########
+def main():
+    # Define dummy sets
+    sfSet = [7, 8, 9]
+    powSet = [2, 5, 8]
+    freqSet = [868100, 868300]
+    state_size = 4
+    action_size = len(sfSet) * len(powSet) * len(freqSet)
+
+    # Initialize agent
+    agent = LoRaDRL(state_size, action_size, sfSet, powSet, freqSet)
+    print("Agent initialized.")
+
+    # Create a dummy state
+    state = np.random.rand(state_size)
+    print("Dummy state:", state)
+
+    # Test action selection
+    action = agent.act(state)
+    print("Selected action:", action)
+    print("Decoded action:", agent.get_phy_parameters(action))
+
+    # Test reward calculation
+    reward = agent.calculate_reward(PDR=0.8, airtime=0.5, power_chosen=5)
+    print("Calculated reward:", reward)
+
+    # Test memory and replay
+    next_state = np.random.rand(state_size)
+    agent.remember(state, action, reward, next_state, False)
+    # Fill memory to batch size for replay
+    for _ in range(agent.batch_size):
+        s = np.random.rand(state_size)
+        a = np.random.randint(0, action_size)
+        r = np.random.rand()
+        ns = np.random.rand(state_size)
+        d = np.random.choice([True, False])
+        agent.remember(s, a, r, ns, d)
+    print("Memory filled. Running replay...")
+    agent.replay()
+    print("Replay complete.")
+
+    # # Test saving and loading weights
+    # agent.save("test_weights.h5")
+    # print("Weights saved.")
+    # agent.load("test_weights.h5")
+    # print("Weights loaded.")
+
+if __name__ == "__main__":
+    main()
