@@ -364,7 +364,7 @@ def placeRandomlyInRange(number, nrIntNodes, locArray, xRange, yRange, refLoc, b
         temp += number_nodes
 
 def airtime(phyParams):
-    """ Computes the airtime of a packet in second.
+    """ Computes the airtime of a packet in milisecond.
     Parameters
     ----------
     sf : int [7...12]
@@ -386,7 +386,7 @@ def airtime(phyParams):
     Returns
     -------
     Tpream + Tpayload: float
-        The time on air of a packer in second.
+        The time on air of a packer in milisecond.
     """
     DE = 1       # low data rate optimization enabled (=1) or not (=0)
     sf, rdd, bw, packetLength, preabmleLength, syncLength, headerEnable, crc = phyParams

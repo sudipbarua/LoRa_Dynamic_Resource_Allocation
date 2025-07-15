@@ -303,7 +303,7 @@ class rlNode(myNode):
         # Storing the last 'n' states of a node 
         self.rssiHistory = []  # Store RSSI history for the node
         # self.snrHistory = []  # Store SNR history for the node
-        self.statesHistory = [[-100, 0.5, 50, 1.0]]  # Initial state: [RSSI, PRR, airtime, battery level]
+        self.statesHistory = [[1, 0, 5, 1.0]]  # Initial state: [Normalized RSSI, PRR, airtime, battery level]
 
         # generate packet and ack
         self.packets = self.generatePacketsToBS(transmitParams, logDistParams)
@@ -338,7 +338,7 @@ class rlNode(myNode):
     def updateAgent(self):
         # calculate PDR only after 5 packets have been transmitted
         prr = self.packetsSuccessful / self.packetsTransmitted if self.packetsTransmitted > 5 else 0
-        reward = self.loraDrlAgent.calculate_reward(prr, self.packets[0].rectime)  # PDR airtime and power usage  
+        reward = self.loraDrlAgent.calculate_reward(prr*10, self.packets[0].rectime/1000)  # PRR (in percentage) and airtime(converted to seconds)  
         prev_state = self.statesHistory[-1]  # get the last state from the history
         current_state = self.get_network_state()
         print(f"[{self.__class__.__name__} updateAgent] Previous state: {prev_state}, Current state: {current_state}, Reward: {reward}")
@@ -368,11 +368,12 @@ class rlNode(myNode):
             Current state of the network.
         """
         rssi = self.packets[0].pRX  # RSSI of the packet
+        normalized_rssi = (rssi - (-137)) / (-70 - (-137))  # Normalize RSSI to [0, 1] range
         # snr = self.packets[0].snr  # SNR of the packet
         prr = self.packetsSuccessful / self.packetsTransmitted if self.packetsTransmitted > 0 else 0  # Packet Reception Rate
-        airtime = self.packets[0].rectime  # Airtime of the packet
+        airtime = self.packets[0].rectime/1000  # Airtime of the packet in seconds
         self.battery_level = self.get_battery_level()
-        state = [rssi, prr, airtime, self.battery_level]  
+        state = [normalized_rssi, prr, airtime, self.battery_level]  
         self.statesHistory.append(state)  # Store the state in the history
         self.rssiHistory.append(rssi)  # Store the RSSI in the history
         # self.snrHistory.append(snr)  # Store the SNR in the history
@@ -392,5 +393,6 @@ class rlNode(myNode):
         # Assuming a AA battery with 2500 mAh suppying constantly at 3.7V 
         # The battery capacity in Joules is 2500 mAh * 3.7V = 9250 mWh = 33,300 J
         battery_capacity = 33300  # in Joules
-        remaining_energy = battery_capacity - self.energy * 10e-3 # Remaining energy in Joules
+        print(f"rlNode get_battery_level] Current energy consumed: {self.energy} J")
+        remaining_energy = battery_capacity - self.energy # Remaining energy in Joules
         return remaining_energy / battery_capacity  # Return the battery level as a fraction of the total capacity
