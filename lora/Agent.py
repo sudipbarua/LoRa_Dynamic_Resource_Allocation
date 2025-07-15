@@ -52,8 +52,10 @@ class LoRaDRL:
 
     def act(self, state):
         if np.random.rand() <= self.epsilon:
+            print("[LoRaDRL act] Random action selected")
             return random.randrange(self.action_size)
 
+        print("[LoRaDRL act] Predicting action based on current state")
         act_values = self.model.predict(state)
         return np.argmax(act_values[0])
 

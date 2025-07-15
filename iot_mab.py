@@ -60,8 +60,8 @@ if __name__ == '__main__':
         # sfSet='7 9 12',
         freqSet='868100 868300 868500',  # Example frequencies in kHz
         # freqSet='867300',
-        powerSet='14',  # Example power levels in dBm
-        # powerSet='2 6 10 14',
+        # powerSet='2 4 6 8 10 12 14',  # Example power levels in dBm
+        powerSet='2 6 10 14',
         captureEffect=1,
         interSFInterference=1,
         infoMode='FULL',  # NO, PARTIAL, FULL

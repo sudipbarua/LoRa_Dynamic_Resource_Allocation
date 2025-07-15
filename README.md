@@ -1,16 +1,8 @@
-# IOT-MAB: Decentralized Intelligent Resource Allocation Approach for LoRaWAN Networks
+# LoRaWAN Dynamic Resource Allocation 
 
 ## Introduction
+In this project, we are going to compare the Multi Armed Bandit, LoRaDRL and other DRL based resource optimization approaches. The simulation environment is build on IoT-MAB. 
 IoT-MAB is a discrete-event simulator based on SimPy for simulating intelligent distributed resource allocation in LoRa networks and to analyse scalability. We also combine the classed and functions for Physical layer of LoRA. 
-
-## How to cite?
-```latex
-@misc{LoRa_MAB,
-author =   {Duc-Tuyen Ta, Kinda Khawam, Samer Lahoud},
-title =    {{LoRaWAN Network Simulator with Reinforcement Learning-based Algorithms}},
-howpublished = {\url{https://github.com/tuyenta/IoT-MAB}},
-}
-```
 
 ## Installation
 It is recommend to use virtualenv to keep your Python environment isolated, together with virtualenvwrapper to make working with virtual environments much more pleasant, e.g.:
@@ -132,20 +124,3 @@ The result of every simulation run will be appended to a file named prob..._X.cs
 The data file is then plotted into .png file by using matplotlib.
 
 ## Changelogs
-
-## Contact
-**Duc-Tuyen Ta**
-
-Postdoc, ROCS, LRI, Paris-Sud University.
-ta@lri.fr
-
-**Kinda Khawam**
-
-Associate Professor at the University of Versailles.
-Associated to the ROCS team in LRI, Paris-Sud University.
-kinda.khawam@gmail.com
-
-**Samer Lahoud**
-
-Faculté d’ingénierie ESIB, Université Saint-Joseph de Beyrouth, Lebanon
-samer.lahoud@usj.edu.lb

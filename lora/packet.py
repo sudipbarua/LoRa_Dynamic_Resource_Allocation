@@ -1,5 +1,6 @@
 from numpy import zeros, random, where
 from .loratools import getRXPower, dBmTomW, airtime
+import numpy as np
 
 class myPacket():
     """ LPWAN Simulator: packet
@@ -193,7 +194,7 @@ class rlPacket(myPacket):
     
         """
         self.packetNumber += 1
-        self.chosenAction = self.agent.act(state)
+        self.chosenAction = self.agent.act(np.array(state).reshape(1, -1))  # reshaping reqired in case state is a 1D array
         self.sf, self.freq, self.pTX = self.setActions[self.chosenAction]
         print(f"[{self.__class__.__name__} updateTXSettings] Node " + str(self.nodeid) + " chose action: " + str(self.chosenAction) + " with SF: " + str(self.sf) + ", Freq: " + str(self.freq) + ", pTX: " + str(self.pTX))
         self.pRX = getRXPower(self.pTX, self.dist, logDistParams)

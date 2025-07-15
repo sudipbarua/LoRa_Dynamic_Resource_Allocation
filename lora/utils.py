@@ -181,7 +181,8 @@ def sim(nrNodes, nrIntNodes, nrBS, initial, radius, distribution, avgSendTime, h
         env.process(transmitPacket(env, node, bsDict, logDistParams, algo))
     
     # save results
-    env.process(saveProb(env, nodeDict, fname, simu_dir))
+    if algo == "exp3" or algo == "exp3s":
+        env.process(saveProb(env, nodeDict, fname, simu_dir))
     env.process(saveRatio(env, nodeDict, fname, simu_dir))
     env.process(saveEnergy(env, nodeDict, fname, simu_dir))
     env.process(saveTraffic(env, nodeDict, fname, simu_dir, sfSet, freqSet, lambda_i, lambda_e))

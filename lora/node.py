@@ -297,7 +297,7 @@ class rlNode(myNode):
         print(f"[myNode __init__] nrActions: {self.nrActions}")
         
         # initialize LoRaDRL agent
-        self.loraDrlAgent = LoRaDRL(state_size=10, action_size=self.nrActions, sfSet=self.sfSet, powSet=self.powerSet, freqSet=self.freqSet)
+        self.loraDrlAgent = LoRaDRL(state_size=4, action_size=self.nrActions, sfSet=self.sfSet, powSet=self.powerSet, freqSet=self.freqSet)
         self.targetUpdateInterval = 100  # Update target model every 100 successful packets
 
         # Storing the last 'n' states of a node 
@@ -341,6 +341,7 @@ class rlNode(myNode):
         reward = self.loraDrlAgent.calculate_reward(prr, self.packets[0].rectime)  # PDR airtime and power usage  
         prev_state = self.statesHistory[-1]  # get the last state from the history
         current_state = self.get_network_state()
+        print(f"[{self.__class__.__name__} updateAgent] Previous state: {prev_state}, Current state: {current_state}, Reward: {reward}")
 
         if self.get_battery_level() <= 0:
             done = True  # Episode is done if battery is empty
@@ -351,8 +352,8 @@ class rlNode(myNode):
         self.loraDrlAgent.replay()  # Train the agent with the replay memory
         # Update target model when the number of successful packets reaches the target update interval
         if self.packetsSuccessful % self.targetUpdateInterval == 0: 
-            self.loraDrlAgent.update_target_model()
             print(f"[{self.__class__.__name__} updateAgent] Updated target model at packetsSuccessful={self.packetsSuccessful}")
+            self.loraDrlAgent.update_target_model()
 
         # # Update target model when the number of total tranmitted packets reaches the target update interval
         # if self.packetsTransmitted % self.targetUpdateInterval == 0: 
