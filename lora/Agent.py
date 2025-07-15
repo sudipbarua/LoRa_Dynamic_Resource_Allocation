@@ -58,7 +58,9 @@ class LoRaDRL:
         return np.argmax(act_values[0])
 
     def replay(self):
+        print("[LoRaDRL replay] Starting replay...")
         if len(self.memory) < self.batch_size:
+            print("[LoRaDRL replay] Not enough data for continuing train/retrain. Current memory size:", len(self.memory))
             return
 
         minibatch = random.sample(self.memory, self.batch_size)
@@ -69,9 +71,9 @@ class LoRaDRL:
         dones = np.array([i[4] for i in minibatch])
         
         current_q = self.model.predict(states)
-
+        # print(f"[LoRaDRL replay] Current Q-values calculated {current_q}")
         future_q = self.target_model.predict(next_states)
-
+        # print(f"[LoRaDRL replay] Future Q-values calculated {future_q}")
         for i in range(len(minibatch)):
             if dones[i]:
                 current_q[i][actions[i]] = rewards[i]

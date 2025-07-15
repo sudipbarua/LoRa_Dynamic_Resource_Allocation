@@ -259,19 +259,63 @@ class rlNode(myNode):
     """
     def __init__(self, nodeid, position, transmitParams, initial, sfSet, freqSet, powSet, bsList,
                  interferenceThreshold, logDistParams, sensi, node_mode, info_mode, horTime, algo, simu_dir, fname):
+        print(f"[myNode __init__] nodeid={nodeid}, position={position}, node_mode={node_mode}, info_mode={info_mode}, algo={algo}")
+        self.nodeid = nodeid # id
+        self.x, self.y = position # location
+        if node_mode == 0:
+            self.node_mode = initial
+        else:
+            self.node_mode = "SMART"
+        print(f"[myNode __init__] Set node_mode: {self.node_mode}")
+
+        self.info_mode = info_mode # 'no', 'partial', 'full'
+        self.bw = int(transmitParams[2])
+        self.period = float(transmitParams[9])
+        self.pTXmax = max(powSet) # max pTX
+        self.sensi = sensi
+
+        print(f"[myNode __init__] bw={self.bw}, period={self.period}, pTXmax={self.pTXmax}")
+
+        # generate proximateBS
+        self.proximateBS = self.generateProximateBS(bsList, interferenceThreshold, logDistParams)
+        print(f"[myNode __init__] Generated proximateBS: {self.proximateBS}")
+
+        # set of actions
+        self.freqSet = freqSet
+        self.powerSet = powSet
+
+        if self.info_mode == "NO":
+            self.sfSet = sfSet
+        else:
+            self.sfSet = self.generateHoppingSfFromDistance(sfSet, logDistParams)
+        print(f"[myNode __init__] sfSet: {self.sfSet}")
+
+        self.setActions = [(self.sfSet[i], self.freqSet[j], self.powerSet[k]) for i in range(len(self.sfSet)) for j in range(len(self.freqSet)) for k in range(len(self.powerSet))]
+        self.nrActions = len(self.setActions)
+        self.initial = initial
+        print(f"[myNode __init__] setActions: {self.setActions}")
+        print(f"[myNode __init__] nrActions: {self.nrActions}")
         
         # initialize LoRaDRL agent
-        self.loraDrlAgent = LoRaDRL(state_size=10, action_size=len(sfSet)*len(freqSet)*len(powSet), sfSet=sfSet, powSet=powSet, freqSet=freqSet)
-        self.learning_rate = self.loraDrlAgent.learning_rate
-        self.alpha = self.loraDrlAgent.alpha  # hyperparameter for tuning PDR impact on reward
-        self.targetUpdateInterval = 100  # update target model every 100 steps
-        super().__init__(nodeid, position, transmitParams, initial, sfSet, freqSet, powSet, bsList,
-                         interferenceThreshold, logDistParams, sensi, node_mode, info_mode, horTime, algo, simu_dir, fname)
+        self.loraDrlAgent = LoRaDRL(state_size=10, action_size=self.nrActions, sfSet=self.sfSet, powSet=self.powerSet, freqSet=self.freqSet)
+        self.targetUpdateInterval = 100  # Update target model every 100 successful packets
+
         # Storing the last 'n' states of a node 
         self.rssiHistory = []  # Store RSSI history for the node
         # self.snrHistory = []  # Store SNR history for the node
-        self.statesHistory = [[-70, 0.5, 50, 1.0]]  # Initial state: [RSSI, PRR, airtime, battery level]
+        self.statesHistory = [[-100, 0.5, 50, 1.0]]  # Initial state: [RSSI, PRR, airtime, battery level]
 
+        # generate packet and ack
+        self.packets = self.generatePacketsToBS(transmitParams, logDistParams)
+        self.ack = {}
+
+        # measurement params
+        self.packetNumber = 0
+        self.packetsTransmitted = 0
+        self.packetsSuccessful = 0
+        self.transmitTime = 0
+        self.energy = 0
+        
     def generatePacketsToBS(self, transmitParams, logDistParams):
         """ Generate dictionary of base-stations in proximity.
         Parameters
@@ -331,6 +375,10 @@ class rlNode(myNode):
         self.statesHistory.append(state)  # Store the state in the history
         self.rssiHistory.append(rssi)  # Store the RSSI in the history
         # self.snrHistory.append(snr)  # Store the SNR in the history
+        if len(self.statesHistory) > 10:
+            self.statesHistory.pop(0)  # Keep only the last 10 states
+            self.rssiHistory.pop(0)
+            # self.snrHistory.pop(0)  # Keep only the last 10 SNR values
         return state
 
     def get_battery_level(self):

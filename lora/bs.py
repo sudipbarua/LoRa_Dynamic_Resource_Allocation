@@ -193,7 +193,7 @@ class myBS():
             lostFlag = False
             collisionFlag = False
             for fbucket in pkt.signalLevel.keys():
-                print("[myBS evaluatePacket] Receiver power from node "+str(nodeid)+" is "+ str(pkt.signalLevel[fbucket][pkt.sf - 7]))
+                # print("[myBS evaluatePacket] Receiver power from node "+str(nodeid)+" is "+ str(pkt.signalLevel[fbucket][pkt.sf - 7]))
                 print("[myBS evaluatePacket] Total power at bs is " + str(self.signalLevel[fbucket][pkt.sf - 7]))
                 signalInBucket = np.dot(self.interactionMatrix[pkt.sf - 7].reshape(1,6), self.signalLevel[fbucket])
                 print("[myBS evaluatePacket] Total power of signal in Frequency is " + str(signalInBucket))

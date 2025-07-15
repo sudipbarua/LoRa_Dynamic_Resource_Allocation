@@ -149,8 +149,8 @@ def sim(nrNodes, nrIntNodes, nrBS, initial, radius, distribution, avgSendTime, h
 
     BSList = BSLoc[0:nrBS,:]
     nodeList = nodeLoc[0:nrNodes,:]
-    print("utils.sim: BSList = {}".format(BSList))
-    print("utils.sim: nodeList = {}".format(nodeList))
+    # print("utils.sim: BSList = {}".format(BSList))
+    # print("utils.sim: nodeList = {}".format(nodeList))
     nodeList[0:nrIntNodes, -1] = 1 # Intelligent nodes
     nodeList[0:nrNodes, -2] = avgSendTime # avgSendTime
     print ("=============== Setup parameters ================")

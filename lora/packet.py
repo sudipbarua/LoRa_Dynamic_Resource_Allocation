@@ -177,7 +177,7 @@ class rlPacket(myPacket):
         super().__init__(nodeid, bsid, dist, transmitParams, logDistParams, sensi, setActions, nrActions, sfSet, prob)
         self.agent = agent  # Reference to the RL agent from RL node 
 
-    def updateTXSettings(self, bsDict, logDistParams, state, init_packet):  # add state parameters like rssiHistory, snrHistory
+    def updateTXSettings(self, bsDict, logDistParams, state):  # add state parameters like rssiHistory, snrHistory
         """ Update the TX settings after frequency hopping.
         Parameters
         ----------
@@ -193,15 +193,9 @@ class rlPacket(myPacket):
     
         """
         self.packetNumber += 1
-        if init_packet:
-            # Choosing random SF, Tx power=max Tx power, and random frequency for the initial packet
-            self.sf = random.choice(self.sfSet)
-            self.freq = random.choice([x for x in bsDict[self.bsid].freqSet if x != 0])  # Avoid zero frequency
-            self.pTX = self.pTXmax
-        else:
-            self.choosenAction = self.agent.act(state)
-            self.sf, self.freq, self.pTX = self.setActions[self.choosenAction]
-            print(f"[{self.__class__.__name__} updateTXSettings] Node " + str(self.nodeid) + " chose action: " + str(self.choosenAction) + " with SF: " + str(self.sf) + ", Freq: " + str(self.freq) + ", pTX: " + str(self.pTX))
+        self.chosenAction = self.agent.act(state)
+        self.sf, self.freq, self.pTX = self.setActions[self.chosenAction]
+        print(f"[{self.__class__.__name__} updateTXSettings] Node " + str(self.nodeid) + " chose action: " + str(self.chosenAction) + " with SF: " + str(self.sf) + ", Freq: " + str(self.freq) + ", pTX: " + str(self.pTX))
         self.pRX = getRXPower(self.pTX, self.dist, logDistParams)
 
         self.signalLevel = self.computePowerDist(bsDict, logDistParams)

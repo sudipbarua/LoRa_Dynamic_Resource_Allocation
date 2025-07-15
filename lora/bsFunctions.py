@@ -48,11 +48,7 @@ def transmitPacket(env, node, bsDict, logDistParams, algo):
             elif algo=="DDQN":
                 # in case of DQN, the choice of action depends on the (previous) states 
                 # So this is where we pass the preceding state information to the agent via the packet object
-                if node.packetNumber == 1:
-                    # sending the initial packet with random SF, Tx power=14, and random frequency
-                    node.packets[bsid].updateTXSettings(bsDict, logDistParams, None, init_packet=True)
-                else:
-                    node.packets[bsid].updateTXSettings(bsDict, logDistParams, node.statesHistory[-1], init_packet=False)
+                node.packets[bsid].updateTXSettings(bsDict, logDistParams, node.statesHistory[-1])
             bsDict[bsid].addPacket(node.nodeid, node.packets[bsid])
             bsDict[bsid].resetACK()
         
