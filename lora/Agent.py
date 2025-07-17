@@ -11,12 +11,11 @@ class LoRaDRL:
         self.state_size = state_size  
         self.action_size = action_size  
         self.num_channels = len(freqSet)
-
         
         self.gamma = 0.7   # discount factor for future rewards
         self.epsilon = 1.0  
         self.epsilon_min = 0.05
-        self.epsilon_decay = 0.00005
+        self.epsilon_decay = 0.995
         self.learning_rate = 0.0005
         self.batch_size = 128
         self.memory = deque(maxlen=30000)
@@ -24,13 +23,12 @@ class LoRaDRL:
         self.model = self._build_model()
         self.target_model = self._build_model()
         self.update_target_model()
-
         
         self.SF_values = sfSet
         self.power_levels = powSet  
         self.channels = freqSet
         # Relative constants for assigning weights to different components of the reward function
-        self.alpha = 1.0   # hyperparameter for tuning PDR
+        self.alpha = 10.0   # hyperparameter for tuning PDR
         self.beta = 0.5   # hyperparameter for tuning airtime
         self.gamma_p = 0.3   # hyperparameter for tuning power usage
 
@@ -51,6 +49,7 @@ class LoRaDRL:
         self.memory.append((state, action, reward, next_state, done))
 
     def act(self, state):
+        # epsilon greedy action selection
         if np.random.rand() <= self.epsilon:
             print("[LoRaDRL act] Random action selected")
             return random.randrange(self.action_size)
@@ -64,7 +63,7 @@ class LoRaDRL:
         if len(self.memory) < self.batch_size:
             print("[LoRaDRL replay] Not enough data for continuing train/retrain. Current memory size:", len(self.memory))
             return
-
+        
         minibatch = random.sample(self.memory, self.batch_size)
         states = np.array([i[0] for i in minibatch])
         actions = np.array([i[1] for i in minibatch])
@@ -83,9 +82,11 @@ class LoRaDRL:
                 current_q[i][actions[i]] = rewards[i] + self.gamma * np.amax(future_q[i])
 
         self.model.fit(states, current_q, epochs=1, verbose=0)
-
+        
+        # Decay epsilon after each replay: expomential decay
         if self.epsilon > self.epsilon_min:
-            self.epsilon -= self.epsilon_decay
+            self.epsilon *= self.epsilon_decay
+            print(f"[LoRaDRL replay] Epsilon decayed to {self.epsilon}")
 
     def calculate_reward(self, PDR, airtime, power_chosen=0):
         power_max = max(self.power_levels)
@@ -116,6 +117,41 @@ class LoRaDRL:
 
     def save(self, name):
         self.model.save_weights(name)
+
+
+class AdaptiveResourceAllocation(LoRaDRL):
+    def __init__(self, state_size, action_size, sfSet, powSet, freqSet):
+        self.state_size = state_size  
+        self.action_size = action_size  
+        self.num_channels = len(freqSet)
+        
+        self.gamma = 0.7   # discount factor for future rewards
+        self.epsilon = 1.0  
+        self.epsilon_min = 0.05
+        self.epsilon_decay = 0.995
+        self.learning_rate = 0.005
+        self.batch_size = 128
+        self.memory = deque(maxlen=30000)
+        
+        self.model = self._build_model()
+        self.target_model = self._build_model()
+        self.update_target_model()
+        
+        self.SF_values = sfSet
+        self.power_levels = powSet  
+        self.channels = freqSet
+        # Relative constants for assigning weights to different components of the reward function
+        self.alpha = 10.0   # hyperparameter for tuning PDR
+        self.beta = 0.5   # hyperparameter for tuning airtime
+        
+    def _build_model(self):
+        return super()._build_model()
+
+    def calculate_reward(self, PDR, airtime, pktLost):
+        if pktLost:
+            return -10.0  # Negative reward for lost packets
+        else:
+            return super().calculate_reward(PDR, airtime)
 
 
 ########## test script ##########

@@ -2,7 +2,7 @@ from __future__ import division
 import numpy as np
 from .loratools import getDistanceFromPower
 from .packet import myPacket, rlPacket
-from .Agent import LoRaDRL
+from .Agent import LoRaDRL, AdaptiveResourceAllocation
 
 class myNode():
     """ LPWAN Simulator: node
@@ -297,7 +297,11 @@ class rlNode(myNode):
         print(f"[myNode __init__] nrActions: {self.nrActions}")
         
         # initialize LoRaDRL agent
-        self.loraDrlAgent = LoRaDRL(state_size=4, action_size=self.nrActions, sfSet=self.sfSet, powSet=self.powerSet, freqSet=self.freqSet)
+        self.algo = algo
+        if self.algo == 'DDQN_LORADRL':
+            self.loraDrlAgent = LoRaDRL(state_size=4, action_size=self.nrActions, sfSet=self.sfSet, powSet=self.powerSet, freqSet=self.freqSet)
+        elif self.algo == 'DDQN_ARA':
+            self.loraDrlAgent = AdaptiveResourceAllocation(state_size=4, action_size=self.nrActions, sfSet=self.sfSet, powSet=self.powerSet, freqSet=self.freqSet)
         self.targetUpdateInterval = 100  # Update target model every 100 successful packets
 
         # Storing the last 'n' states of a node 
@@ -338,7 +342,10 @@ class rlNode(myNode):
     def updateAgent(self):
         # calculate PDR only after 5 packets have been transmitted
         prr = self.packetsSuccessful / self.packetsTransmitted if self.packetsTransmitted > 5 else 0
-        reward = self.loraDrlAgent.calculate_reward(prr*10, self.packets[0].rectime/1000)  # PRR (in percentage) and airtime(converted to seconds)  
+        if self.algo == 'DDQN_LORADRL':
+            reward = self.loraDrlAgent.calculate_reward(prr, self.packets[0].rectime/1000)  # PRR (in percentage) and airtime(converted to seconds)
+        elif self.algo == 'DDQN_ARA':
+            reward = self.loraDrlAgent.calculate_reward(prr, self.packets[0].rectime/1000, self.packets[0].isLost)
         prev_state = self.statesHistory[-1]  # get the last state from the history
         current_state = self.get_network_state()
         print(f"[{self.__class__.__name__} updateAgent] Previous state: {prev_state}, Current state: {current_state}, Reward: {reward}")

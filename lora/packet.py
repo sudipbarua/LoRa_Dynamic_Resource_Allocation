@@ -173,7 +173,6 @@ class rlPacket(myPacket):
     \param [IN] sfSet: set of spreading factors
     \param [IN] prob: probability
     """
-    
     def __init__(self, nodeid, bsid, dist, transmitParams, logDistParams, sensi, setActions, nrActions, sfSet, agent, prob={'dummy': 'dummy'}):
         super().__init__(nodeid, bsid, dist, transmitParams, logDistParams, sensi, setActions, nrActions, sfSet, prob)
         self.agent = agent  # Reference to the RL agent from RL node 
