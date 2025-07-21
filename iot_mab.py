@@ -45,15 +45,15 @@ if __name__ == '__main__':
     # # print args and run simulation
 
     args = SimpleNamespace(
-        nrNodes=4,
-        nrIntNodes=4,
+        nrNodes=100,
+        nrIntNodes=100,
         nrBS=1,
         initial='UNIFORM',
         radius=4500,
-        distribution='0.5 0.5',
-        # distribution='0.2 0.2 0.2 0.2 0.1 0.1',
+        # distribution='0.5 0.5',
+        distribution='0.2 0.2 0.2 0.2 0.1 0.1',
         # distribution='1', 
-        AvgSendTime= 15*60*10e3,  # 1 minutes in ms
+        AvgSendTime= 15*60e3,  # 15 minutes in ms
         horizonTime= 1400,
         packetLength=50,
         sfSet='7 8 9 10 11 12',  # Example spreading factors
@@ -66,7 +66,7 @@ if __name__ == '__main__':
         interSFInterference=1,
         infoMode='FULL',  # NO, PARTIAL, FULL
         Algo='DDQN_ARA',  # exp3, exp3s, DDQN_LORADRL, DDQN_ARA
-        exp_name='DDQN_ARA_punish-10_lr-005',
+        exp_name='DDQN_ARA_last100PRR_100nodes_2',
         logdir='./all_experiments/exp3sVSddqn'
     )
     main(args)

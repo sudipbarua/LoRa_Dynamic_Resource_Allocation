@@ -169,7 +169,7 @@ def savePRRlastFew(env, nodeDict, fname, simu_dir):
     -------
     """
     while True:
-        yield env.timeout(100 * 3600000)
+        yield env.timeout(24 * 3600000)
         # write packet reception ratio to file
         PacketReceptionRatioLastFew = 0
         nTransmitted = sum(

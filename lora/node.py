@@ -343,7 +343,9 @@ class rlNode(myNode):
     
     def updateAgent(self):
         # calculate PDR only after 5 packets have been transmitted
-        prr = self.packetsSuccessful / self.packetsTransmitted if self.packetsTransmitted > 5 else 0
+        # prr = self.packetsSuccessful / self.packetsTransmitted if self.packetsTransmitted > 5 else 0
+        # Testing with PRR from the last 100 packets
+        prr = sum(self.packetsSuccessfulHistory[-100:]) / sum(self.packetsTransmittedHistory[-100:]) if len(self.packetsTransmittedHistory) > 5 else 0
         if self.algo == 'DDQN_LORADRL':
             reward = self.loraDrlAgent.calculate_reward(prr, self.packets[0].rectime/1000)  # PRR (in percentage) and airtime(converted to seconds)
         elif self.algo == 'DDQN_ARA':
@@ -379,7 +381,8 @@ class rlNode(myNode):
         rssi = self.packets[0].pRX  # RSSI of the packet
         normalized_rssi = (rssi - (-137)) / (-70 - (-137))  # Normalize RSSI to [0, 1] range
         # snr = self.packets[0].snr  # SNR of the packet
-        prr = self.packetsSuccessful / self.packetsTransmitted if self.packetsTransmitted > 0 else 0  # Packet Reception Rate
+        # prr = self.packetsSuccessful / self.packetsTransmitted if self.packetsTransmitted > 5 else 0  # Packet Reception Rate
+        prr = sum(self.packetsSuccessfulHistory[-100:]) / sum(self.packetsTransmittedHistory[-100:]) if len(self.packetsTransmittedHistory) > 5 else 0  # PRR from the last 100 packets
         airtime = self.packets[0].rectime/1000  # Airtime of the packet in seconds
         self.battery_level = self.get_battery_level()
         state = [normalized_rssi, prr, airtime, self.battery_level]  
