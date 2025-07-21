@@ -308,6 +308,8 @@ class rlNode(myNode):
         self.rssiHistory = []  # Store RSSI history for the node
         # self.snrHistory = []  # Store SNR history for the node
         self.statesHistory = [[1, 0, 5, 1.0]]  # Initial state: [Normalized RSSI, PRR, airtime, battery level]
+        self.packetsSuccessfulHistory = []  # Store successful packets history
+        self.packetsTransmittedHistory = []  # Store transmitted packets history
 
         # generate packet and ack
         self.packets = self.generatePacketsToBS(transmitParams, logDistParams)

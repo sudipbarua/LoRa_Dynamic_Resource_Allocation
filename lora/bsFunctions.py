@@ -100,6 +100,8 @@ def transmitPacket(env, node, bsDict, logDistParams, algo):
             if algo=='exp3' or algo=='exp3s':
                 node.updateProb(algo)
         if algo=='DDQN_LORADRL' or algo=='DDQN_ARA':
+            node.packetsTransmittedHistory.append(1)
+            node.packetsSuccessfulHistory.append(1 if successfulRx else 0)
             node.updateAgent()
         # print("[bsFunctions transmitPacket]Probability of action from node " +str(node.nodeid)+ " at (t+1)= {}".format(int(1+env.now/(6*60*1000))))
         # print(node.prob)
@@ -150,6 +152,44 @@ def saveProb(env, nodeDict, fname, simu_dir):
                 with open(filename, "a") as myfile:
                     myfile.write(res)
                 myfile.close()
+
+def savePRRlastFew(env, nodeDict, fname, simu_dir):
+    """ Save packet reception ratio of last 100 or 1000 packets 
+    Parameters
+    ----------
+    env : simpy environement
+        Simulation environment.
+    nodeDict:dict
+        list of nodes.
+    fname: string
+        file name structure
+    simu_dir: string
+        folder
+    Returns
+    -------
+    """
+    while True:
+        yield env.timeout(100 * 3600000)
+        # write packet reception ratio to file
+        PacketReceptionRatioLastFew = 0
+        nTransmitted = sum(
+            sum(nodeDict[nodeid].packetsTransmittedHistory[-100:]) 
+            for nodeid in nodeDict.keys()
+            )
+        nRecvd = sum(
+            sum(nodeDict[nodeid].packetsSuccessfulHistory[-100:]) 
+            for nodeid in nodeDict.keys()
+            )
+        if nTransmitted > 0:
+            PacketReceptionRatioLastFew = nRecvd/nTransmitted
+        filename = join(simu_dir, str('PRR_last_few'+ fname) + '.csv')
+        if os.path.isfile(filename):
+            res = "\n" + str(PacketReceptionRatioLastFew)
+        else:
+            res = str(PacketReceptionRatioLastFew)
+        with open(filename, "a") as myfile:
+            myfile.write(res)
+        myfile.close()
 
 def saveRatio(env, nodeDict, fname, simu_dir):
     """ Save packet reception ratio to file
