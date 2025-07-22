@@ -48,7 +48,7 @@ def transmitPacket(env, node, bsDict, logDistParams, algo):
             elif algo=="DDQN_LORADRL" or algo=="DDQN_ARA":
                 # in case of DQN, the choice of action depends on the (previous) states 
                 # So this is where we pass the preceding state information to the agent via the packet object
-                node.packets[bsid].updateTXSettings(bsDict, logDistParams, node.statesHistory[-1])
+                node.packets[bsid].updateTXSettings(bsDict, logDistParams, node.previousState)
             bsDict[bsid].addPacket(node.nodeid, node.packets[bsid])
             bsDict[bsid].resetACK()
         
@@ -88,7 +88,8 @@ def transmitPacket(env, node, bsDict, logDistParams, algo):
                 
         # update probability        
         node.packetsTransmitted += 1
-        node.energy += node.packets[0].rectime * dBmTomW(node.packets[0].pTX) * (3.0) /1e6 # V = 3.0     # voltage XXX
+        node.energyConsumedByThisPacket = node.packets[0].rectime * dBmTomW(node.packets[0].pTX) * (3.0) /1e6 # V = 3.0     # voltage XXX
+        node.energy += node.energyConsumedByThisPacket
         if successfulRx:
             if node.info_mode in ["NO", "PARTIAL"]:
                 node.packetsSuccessful += 1
