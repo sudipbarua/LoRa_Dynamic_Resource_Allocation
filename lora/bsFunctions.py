@@ -45,7 +45,7 @@ def transmitPacket(env, node, bsDict, logDistParams, algo):
             if algo=="exp3" or algo=="exp3s": 
                 prob_temp = [node.prob[x] for x in node.prob]
                 node.packets[bsid].updateTXSettings(bsDict, logDistParams, prob_temp)
-            elif algo=="DDQN_LORADRL" or algo=="DDQN_ARA":
+            else:
                 # in case of DQN, the choice of action depends on the (previous) states 
                 # So this is where we pass the preceding state information to the agent via the packet object
                 node.packets[bsid].updateTXSettings(bsDict, logDistParams, node.previousState)
@@ -100,7 +100,7 @@ def transmitPacket(env, node, bsDict, logDistParams, algo):
                     node.transmitTime += node.packets[0].rectime
             if algo=='exp3' or algo=='exp3s':
                 node.updateProb(algo)
-        if algo=='DDQN_LORADRL' or algo=='DDQN_ARA':
+        if algo!='exp3' or algo!='exp3s':
             node.packetsTransmittedHistory.append(1)
             node.packetsSuccessfulHistory.append(1 if successfulRx else 0)
             node.updateAgent()

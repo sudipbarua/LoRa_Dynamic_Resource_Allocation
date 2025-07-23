@@ -2,7 +2,7 @@ from __future__ import division
 import numpy as np
 from .loratools import getDistanceFromPower
 from .packet import myPacket, rlPacket
-from .Agent import LoRaDRL, AdaptiveResourceAllocation
+from .Agent import LoRaDRL, AdaptiveResourceAllocation, LoRaQLAgent, DQNAgent
 
 class myNode():
     """ LPWAN Simulator: node
@@ -313,7 +313,8 @@ class rlNode(myNode):
         self.targetUpdateInterval = 100  # Update target model every 100 successful packets
 
         # generate packet and ack
-        self.packets = self.generatePacketsToBS(transmitParams, logDistParams)
+        # Unlike the parent class, we only initialize the packets attribute here and initialize in the sim function of utils.py
+        self.packets = {}
         self.ack = {}
 
         # measurement params
@@ -393,7 +394,7 @@ class rlNode(myNode):
         prr = current_state[1]  # PRR from the current state
         if self.algo == 'DDQN_LORADRL':
             reward = self.loraDrlAgent.calculate_reward(prr, self.packets[0].rectime/1000)  # PRR (in percentage) and airtime(converted to seconds)
-        elif self.algo == 'DDQN_ARA':
+        else:
             reward = self.loraDrlAgent.calculate_reward(prr, self.packets[0].rectime/1000, self.packets[0].isLost)
         print(f"[{self.__class__.__name__} updateAgent] Previous state: {self.previousState}, Current state: {current_state}, Reward: {reward}")
 
@@ -449,3 +450,33 @@ class rlNode(myNode):
         # print(f"rlNode get_battery_level] Current energy consumed: {self.energy} J")
         remaining_energy = battery_capacity - self.energy # Remaining energy in Joules
         return remaining_energy / battery_capacity  # Return the battery level as a fraction of the total capacity
+    
+
+class qlNode(rlNode):
+    def __init__(self, nodeid, position, transmitParams, initial, sfSet, freqSet, powSet, bsList, interferenceThreshold, logDistParams, sensi, node_mode, info_mode, horTime, algo, simu_dir, fname):
+        super().__init__(nodeid, position, transmitParams, initial, sfSet, freqSet, powSet, bsList, interferenceThreshold, logDistParams, sensi, node_mode, info_mode, horTime, algo, simu_dir, fname)
+        self.loraDrlAgent = LoRaQLAgent(state_size=len(self.previousState), action_size=self.nrActions, sfSet=self.sfSet, powSet=self.powerSet, freqSet=freqSet)
+
+    def updateAgent(self):
+        # Get the last state from the memory or use a default state
+        if self.loraDrlAgent.memory.__len__() > 0:
+            # Get the sate from the memory if available otherwise use the default state [1, 0, 5, 1.0]
+            self.previousState = self.loraDrlAgent.memory[-1][3]           
+        current_state = self.get_network_state()
+        prr = current_state[1]  # PRR from the current state
+        reward = self.loraDrlAgent.calculate_reward(prr, self.packets[0].rectime/1000, self.packets[0].isLost)
+        # print(f"[{self.__class__.__name__} updateAgent] Previous state: {self.previousState}, Current state: {current_state}, Reward: {reward}")
+
+        if self.get_battery_level() <= 0:
+            done = True  # Episode is done if battery is empty
+        else:
+            done = False  # Assuming the episode is not done yet
+
+        self.loraDrlAgent.remember(self.previousState, self.packets[0].chosenAction, reward, current_state, done)
+        self.loraDrlAgent.replay()  # Train the agent with the replay memory
+
+
+class dqnNode(rlNode):
+    def __init__(self, nodeid, position, transmitParams, initial, sfSet, freqSet, powSet, bsList, interferenceThreshold, logDistParams, sensi, node_mode, info_mode, horTime, algo, simu_dir, fname):
+        super().__init__(nodeid, position, transmitParams, initial, sfSet, freqSet, powSet, bsList, interferenceThreshold, logDistParams, sensi, node_mode, info_mode, horTime, algo, simu_dir, fname)
+        self.loraDrlAgent = DQNAgent(state_size=len(self.previousState), action_size=self.nrActions, sfSet=self.sfSet, powSet=self.powerSet, freqSet=self.freqSet)

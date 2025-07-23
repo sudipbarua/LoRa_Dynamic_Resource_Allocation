@@ -12,7 +12,7 @@ import numpy as np
 from os.path import join, exists
 from os import makedirs
 import simpy
-from .node import myNode, rlNode
+from .node import myNode, rlNode, qlNode, dqnNode
 from .bs import myBS
 from .bsFunctions import transmitPacket, cuckooClock, saveProb, saveRatio, saveEnergy, saveTraffic, savePRRlastFew
 from .loratools import dBmTomW, getMaxTransmitDistance, placeRandomlyInRange, placeRandomly
@@ -171,23 +171,33 @@ def sim(nrNodes, nrIntNodes, nrBS, initial, radius, distribution, avgSendTime, h
         
     nodeDict = {} # setup empty dictionary for nodes
     for elem in nodeList:
+        transmitParams = elem[3:13]
         if algo=="exp3" or algo=="exp3s":
             node = myNode(int(elem[0]), (elem[1], elem[2]), elem[3:13], initial, sfSet, freqSet, powSet,
                           BSList, interferenceThreshold, logDistParams, sensi, elem[13], info_mode, horTime, algo, simu_dir, fname)
-        elif algo=="DDQN_LORADRL" or algo=="DDQN_ARA":
-            node = rlNode(int(elem[0]), (elem[1], elem[2]), elem[3:13], initial, sfSet, freqSet, powSet,
-                          BSList, interferenceThreshold, logDistParams, sensi, elem[13], info_mode, horTime, algo, simu_dir, fname)
+        else:
+            if algo=="DDQN_LORADRL" or algo=="DDQN_ARA":
+                node = rlNode(int(elem[0]), (elem[1], elem[2]), transmitParams, initial, sfSet, freqSet, powSet,
+                            BSList, interferenceThreshold, logDistParams, sensi, elem[13], info_mode, horTime, algo, simu_dir, fname)
+            elif algo=="QL_ARA":
+                node = qlNode(int(elem[0]), (elem[1], elem[2]), transmitParams, initial, sfSet, freqSet, powSet,
+                            BSList, interferenceThreshold, logDistParams, sensi, elem[13], info_mode, horTime, algo, simu_dir, fname)
+            elif algo=="DQN_ARA":
+                node = dqnNode(int(elem[0]), (elem[1], elem[2]), transmitParams, initial, sfSet, freqSet, powSet,
+                            BSList, interferenceThreshold, logDistParams, sensi, elem[13], info_mode, horTime, algo, simu_dir, fname)
+            node.packets = node.generatePacketsToBS(transmitParams, logDistParams)
+            
         nodeDict[node.nodeid] = node
         env.process(transmitPacket(env, node, bsDict, logDistParams, algo))
     
     # save results
     if algo == "exp3" or algo == "exp3s":
         env.process(saveProb(env, nodeDict, fname, simu_dir))
+    else:
+        env.process(savePRRlastFew(env, nodeDict, fname, simu_dir))
     env.process(saveRatio(env, nodeDict, fname, simu_dir))
     env.process(saveEnergy(env, nodeDict, fname, simu_dir))
     env.process(saveTraffic(env, nodeDict, fname, simu_dir, sfSet, freqSet, lambda_i, lambda_e))
-    if algo == "DDQN_LORADRL" or algo == "DDQN_ARA":
-        env.process(savePRRlastFew(env, nodeDict, fname, simu_dir))
     
     env.run(until=simtime)
     

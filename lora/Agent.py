@@ -59,9 +59,9 @@ class LoRaDRL:
         return np.argmax(act_values[0])
 
     def replay(self):
-        print("[LoRaDRL replay] Starting replay...")
+        # print("[LoRaDRL replay] Starting replay...")
         if len(self.memory) < self.batch_size:
-            print("[LoRaDRL replay] Not enough data for continuing train/retrain. Current memory size:", len(self.memory))
+            # print("[LoRaDRL replay] Not enough data for continuing train/retrain. Current memory size:", len(self.memory))
             return
         
         minibatch = random.sample(self.memory, self.batch_size)
@@ -86,7 +86,7 @@ class LoRaDRL:
         # Decay epsilon after each replay: expomential decay
         if self.epsilon > self.epsilon_min:
             self.epsilon *= self.epsilon_decay
-            print(f"[LoRaDRL replay] Epsilon decayed to {self.epsilon}")
+            # print(f"[LoRaDRL replay] Epsilon decayed to {self.epsilon}")
 
     def calculate_reward(self, PDR, airtime, power_chosen=0):
         power_max = max(self.power_levels)
@@ -152,6 +152,106 @@ class AdaptiveResourceAllocation(LoRaDRL):
             return -10.0  # Negative reward for lost packets
         else:
             return super().calculate_reward(PDR, airtime)
+
+
+class LoRaQLAgent(AdaptiveResourceAllocation):
+    def __init__(self, state_size, action_size, sfSet, powSet, freqSet):
+        super().__init__(state_size, action_size, sfSet, powSet, freqSet)
+        self.name = "LoRaQLAgent"
+
+        # Q-table: stores Q-values for each state-action pair
+        # Initialized with zeros. Dimensions: (num_discrete_states, action_size)
+        self.q_table = np.zeros((self.state_size, self.action_size))
+
+    def replay(self):
+        # Updating the Q-table using the Bellman equation
+        # Unusual naming. But we keep it for maintaining the consistency with the parent classes
+        
+        # Ensure enough experiences are in memory to form a batch
+        if len(self.memory) < self.batch_size:
+            return
+
+        minibatch = random.sample(self.memory, self.batch_size) # Sample a random mini-batch
+
+        for state, action, reward, next_state, done in minibatch:
+            # Get the current Q-value for the (state, action) pair
+            current_q_value = self.q_table[state, action]
+
+            if done:
+                # If the episode ended, the target Q-value is just the reward
+                target_q_value = reward
+            else:
+                # Calculate the maximum Q-value for the next state
+                max_future_q = np.max(self.q_table[next_state, :])
+                # Bellman equation for Q-learning update
+                target_q_value = reward + self.gamma * max_future_q
+
+            # Update the Q-value using the Q-learning formula
+            self.q_table[state, action] = current_q_value + self.learning_rate * (target_q_value - current_q_value)
+
+        # Decay epsilon after each learning step to reduce exploration over time
+        if self.epsilon > self.epsilon_min:
+            self.epsilon *= self.epsilon_decay
+            # print(f"[LoRaQLearningAgent learn] Epsilon decayed to {self.epsilon:.4f}")
+
+    def save_q_table(self, filename="q_table.npy"):
+        """
+        Saves the Q-table to a file using NumPy's save function.
+
+        Args:
+            filename (str): The name of the file to save the Q-table to.
+        """
+        np.save(filename, self.q_table)
+        print(f"Q-table saved to {filename}")
+
+    def load_q_table(self, filename="q_table.npy"):
+        """
+        Loads the Q-table from a file using NumPy's load function.
+
+        Args:
+            filename (str): The name of the file to load the Q-table from.
+        """
+        try:
+            self.q_table = np.load(filename)
+            print(f"Q-table loaded from {filename}")
+        except FileNotFoundError:
+            print(f"Error: Q-table file '{filename}' not found. Initializing with zeros.")
+            # Q-table remains zeros as initialized in __init__ if file not found
+
+
+class DQNAgent(AdaptiveResourceAllocation):
+    def __init__(self, state_size, action_size, sfSet, powSet, freqSet):
+        super().__init__(state_size, action_size, sfSet, powSet, freqSet)
+
+    def replay(self):
+        # print("[LoRaDRL replay] Starting replay...")
+        if len(self.memory) < self.batch_size:
+            # print("[LoRaDRL replay] Not enough data for continuing train/retrain. Current memory size:", len(self.memory))
+            return
+        
+        minibatch = random.sample(self.memory, self.batch_size)
+        states = np.array([i[0] for i in minibatch])
+        actions = np.array([i[1] for i in minibatch])
+        rewards = np.array([i[2] for i in minibatch])
+        next_states = np.array([i[3] for i in minibatch])
+        dones = np.array([i[4] for i in minibatch])
+        
+        current_q = self.model.predict(states)
+        # print(f"[LoRaDRL replay] Current Q-values calculated {current_q}")
+        future_q = self.model.predict(next_states)
+        # print(f"[LoRaDRL replay] Future Q-values calculated {future_q}")
+        for i in range(len(minibatch)):
+            if dones[i]:
+                current_q[i][actions[i]] = rewards[i]
+            else:
+                current_q[i][actions[i]] = rewards[i] + self.gamma * np.amax(future_q[i])
+
+        self.model.fit(states, current_q, epochs=1, verbose=0)
+        
+        # Decay epsilon after each replay: expomential decay
+        if self.epsilon > self.epsilon_min:
+            self.epsilon *= self.epsilon_decay
+            # print(f"[LoRaDRL replay] Epsilon decayed to {self.epsilon}")
 
 
 ########## test script ##########
