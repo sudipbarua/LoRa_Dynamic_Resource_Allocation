@@ -12,11 +12,28 @@ import numpy as np
 from os.path import join, exists
 from os import makedirs
 import simpy
-from .node import myNode, rlNode, qlNode, dqnNode
+from .node import myNode, rlNode, qlNode, sysOptimizerRlNode
 from .bs import myBS
 from .bsFunctions import transmitPacket, cuckooClock, saveProb, saveRatio, saveEnergy, saveTraffic, savePRRlastFew
 from .loratools import dBmTomW, getMaxTransmitDistance, placeRandomlyInRange, placeRandomly
 from .plotting import plotLocations
+from .Agent import LoRaDRL, AdaptiveResourceAllocation, LoRaQLAgent, DQNAgent, AraSysOptimizerAgent
+
+
+class EnergyMonitor():
+    # Energy monitor for the overall system
+    def __init__(self):
+        self.totalEnergy = 0
+        self.avgErgPerPkt = 0.01
+
+
+class PrrMonitor():
+    # Packet reception monitor for the overall system
+    def __init__(self):
+        self.prrSys = 0  # Packet Reception Ratio of the system
+        self.sysWidePktTx = 0
+        self.sysWideSuccessfulPkt = 0
+
 
 def print_params(nrNodes, nrIntNodes, nrBS, initial, radius, distribution, avgSendTime, horTime, packetLength, sfSet, freqSet, powSet, captureEffect, interSFInterference, info_mode, algo):
     # print parametters
@@ -37,7 +54,8 @@ def print_params(nrNodes, nrIntNodes, nrBS, initial, radius, distribution, avgSe
     print ("\t Inter-SF Interference:",interSFInterference)
     print ("\t Information mode:",info_mode)
     print ("\t Learning algorithm:", algo)
-        
+
+
 def sim(nrNodes, nrIntNodes, nrBS, initial, radius, distribution, avgSendTime, horTime, packetLength, sfSet, freqSet, 
         powSet, captureEffect, interSFInterference, info_mode, algo, logdir, exp_name) :
     
@@ -169,26 +187,62 @@ def sim(nrNodes, nrIntNodes, nrBS, initial, radius, distribution, avgSendTime, h
     for elem in BSList:
         bsDict[int(elem[0])] = myBS(int(elem[0]), (elem[1], elem[2]), interactionMatrix, nDemodulator, ackLength, freqSet, sfSet, captureThreshold)
         
+    # Total (Sysrem-wide) energy conumption and system-wide PRR monitor
+    erg_monitor = EnergyMonitor()
+    prr_monitor = PrrMonitor()
+
     nodeDict = {} # setup empty dictionary for nodes
     for elem in nodeList:
         transmitParams = elem[3:13]
         if algo=="exp3" or algo=="exp3s":
             node = myNode(int(elem[0]), (elem[1], elem[2]), elem[3:13], initial, sfSet, freqSet, powSet,
                           BSList, interferenceThreshold, logDistParams, sensi, elem[13], info_mode, horTime, algo, simu_dir, fname)
+            nodeDict[node.nodeid] = node
+            env.process(transmitPacket(env, node, bsDict, logDistParams, algo))
         else:
-            if algo=="DDQN_LORADRL" or algo=="DDQN_ARA":
-                node = rlNode(int(elem[0]), (elem[1], elem[2]), transmitParams, initial, sfSet, freqSet, powSet,
-                            BSList, interferenceThreshold, logDistParams, sensi, elem[13], info_mode, horTime, algo, simu_dir, fname)
-            elif algo=="QL_ARA":
+            if algo=="QL_ARA":
                 node = qlNode(int(elem[0]), (elem[1], elem[2]), transmitParams, initial, sfSet, freqSet, powSet,
                             BSList, interferenceThreshold, logDistParams, sensi, elem[13], info_mode, horTime, algo, simu_dir, fname)
-            elif algo=="DQN_ARA":
-                node = dqnNode(int(elem[0]), (elem[1], elem[2]), transmitParams, initial, sfSet, freqSet, powSet,
+                drlAgent = LoRaQLAgent(
+                    state_size=len(node.previousState),
+                    action_size=node.nrActions, 
+                    sfSet=node.sfSet, powSet=node.powerSet, 
+                    freqSet=node.freqSet
+                )
+            elif algo=="DDQN_sysOptim":
+                node = sysOptimizerRlNode(int(elem[0]), (elem[1], elem[2]), transmitParams, initial, sfSet, freqSet, powSet,
                             BSList, interferenceThreshold, logDistParams, sensi, elem[13], info_mode, horTime, algo, simu_dir, fname)
-            node.packets = node.generatePacketsToBS(transmitParams, logDistParams)
-            
-        nodeDict[node.nodeid] = node
-        env.process(transmitPacket(env, node, bsDict, logDistParams, algo))
+                drlAgent = AraSysOptimizerAgent(
+                    state_size=len(node.previousState),
+                    action_size=node.nrActions, 
+                    sfSet=node.sfSet, powSet=node.powerSet, 
+                    freqSet=node.freqSet
+                )
+        
+            else: 
+                node = rlNode(int(elem[0]), (elem[1], elem[2]), transmitParams, initial, sfSet, freqSet, powSet,
+                            BSList, interferenceThreshold, logDistParams, sensi, elem[13], info_mode, horTime, algo, simu_dir, fname)
+                if algo=="DDQN_LORADRL":
+                    drlAgent = LoRaDRL(state_size=len(node.previousState),
+                                       action_size=node.nrActions, 
+                                       sfSet=node.sfSet, powSet=node.powerSet, 
+                                       freqSet=node.freqSet) 
+                elif algo=="DDQN_ARA":
+                    drlAgent = AdaptiveResourceAllocation(state_size=len(node.previousState), 
+                                                          action_size=node.nrActions, 
+                                                          sfSet=node.sfSet, powSet=node.powerSet, 
+                                                          freqSet=node.freqSet)
+                elif algo=="DQN_ARA":
+                    drlAgent = DQNAgent(state_size=len(node.previousState),
+                                       action_size=node.nrActions, 
+                                       sfSet=node.sfSet, powSet=node.powerSet, 
+                                       freqSet=node.freqSet)
+            # Now we attach the agent to the node
+            node.setRlAgent(drlAgent)
+            node.generatePacketsToBS(transmitParams, logDistParams)
+            # Svae nodes in the dict and schedule transmission
+            nodeDict[node.nodeid] = node
+            env.process(transmitPacket(env, node, bsDict, logDistParams, algo, erg_monitor, prr_monitor))
     
     # save results
     if algo == "exp3" or algo == "exp3s":

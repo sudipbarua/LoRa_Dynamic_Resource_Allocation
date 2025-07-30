@@ -30,7 +30,7 @@ def main(args):
     
     assert initial in ["UNIFORM", "RANDOM"], "Initial mode must be UNIFORM, RANDOM."
     assert info_mode in ["NO", "PARTIAL", "FULL"], "Initial mode must be NO, PARTIAL, or FULL."
-    assert algo in ["exp3", "exp3s", "DDQN_ARA", "DDQN_LORADRL", "QL_ARA", "DQN_ARA"], "Learning algorithm must be exp3, exp3s, DDQN_ARA, DDQN_LORADRL, QL_ARA"
+    assert algo in ["exp3", "exp3s", "DDQN_ARA", "DDQN_LORADRL", "QL_ARA", "DQN_ARA", "DDQN_sysOptim"], "Learning algorithm must be exp3, exp3s, DDQN_ARA, DDQN_LORADRL, QL_ARA, DDQN_sysOptim"
     
     
     # running simulation
@@ -65,8 +65,8 @@ if __name__ == '__main__':
         captureEffect=1,
         interSFInterference=1,
         infoMode='FULL',  # NO, PARTIAL, FULL
-        Algo='QL_ARA',  # exp3, exp3s, DDQN_LORADRL, DDQN_ARA, QL_ARA, DDQN_ARA
-        exp_name='QL_ARA_test',
+        Algo='DDQN_sysOptim',  # exp3, exp3s, DDQN_LORADRL, DDQN_ARA, QL_ARA, DQN_ARA, DDQN_sysOptim
+        exp_name='DDQN_sysOptim_test',
         logdir='./all_experiments/exp3sVSddqn'
     )
     main(args)

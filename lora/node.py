@@ -2,7 +2,7 @@ from __future__ import division
 import numpy as np
 from .loratools import getDistanceFromPower
 from .packet import myPacket, rlPacket
-from .Agent import LoRaDRL, AdaptiveResourceAllocation, LoRaQLAgent, DQNAgent
+
 
 class myNode():
     """ LPWAN Simulator: node
@@ -302,14 +302,13 @@ class rlNode(myNode):
         # self.snrHistory = []  # Store SNR history for the node
         self.packetsSuccessfulHistory = []  # Store successful packets history
         self.packetsTransmittedHistory = []  # Store transmitted packets history
-        self.previousState = [1, 0, 5, 1.0, 0]  # Initial state: [Normalized RSSI, PRR, airtime, battery level]
+        self._stateInit = True
+        self.previousState = self.get_network_state()
+        self._stateInit = False
 
         # initialize LoRaDRL agent
+        self.loraDrlAgent = None  # In the new version we use a setter to set the agent from the outside for modularity 
         self.algo = algo
-        if self.algo == 'DDQN_LORADRL':
-            self.loraDrlAgent = LoRaDRL(state_size=len(self.previousState), action_size=self.nrActions, sfSet=self.sfSet, powSet=self.powerSet, freqSet=self.freqSet)
-        elif self.algo == 'DDQN_ARA':
-            self.loraDrlAgent = AdaptiveResourceAllocation(state_size=len(self.previousState), action_size=self.nrActions, sfSet=self.sfSet, powSet=self.powerSet, freqSet=self.freqSet)
         self.targetUpdateInterval = 100  # Update target model every 100 successful packets
 
         # generate packet and ack
@@ -325,6 +324,8 @@ class rlNode(myNode):
         self.energy = 0
         self.energyConsumedByThisPacket = 0  # Energy consumed for the last packet in joules
         
+    def setRlAgent(self, loraDrlAgent):
+        self.loraDrlAgent = loraDrlAgent
     
     def generateHoppingSfFromDistance(self, sfSet, powSet, logDistParams):
         """ Generate the sf hopping sequence and power set from distance
@@ -365,7 +366,6 @@ class rlNode(myNode):
         print(f"[myNode generateHoppingSfFromDistance] SF Buckets: {sfBuckets} and Power Buckets: {powBuckets}")
         return sfBuckets, powBuckets
 
-    
     def generatePacketsToBS(self, transmitParams, logDistParams):
         """ Generate dictionary of base-stations in proximity.
         Parameters
@@ -379,11 +379,9 @@ class rlNode(myNode):
         packets: packet
             packets at BS
         """
-        packets = {} # empty dictionary to store packets originating at a node
         for bsid, dist in self.proximateBS.items():
-            packets[bsid] = rlPacket(self.nodeid, bsid, dist, transmitParams, logDistParams, self.sensi, self.setActions, self.nrActions, self.sfSet, agent=self.loraDrlAgent)
-        print(f"[rlNode generatePacketsToBS] Packets generated: {packets}")
-        return packets
+            self.packets[bsid] = rlPacket(self.nodeid, bsid, dist, transmitParams, logDistParams, self.sensi, self.setActions, self.nrActions, self.sfSet, agent=self.loraDrlAgent)
+        print(f"[rlNode generatePacketsToBS] Packets generated: {self.packets}")
     
     def updateAgent(self):
         # Get the last state from the memory or use a default state
@@ -422,19 +420,21 @@ class rlNode(myNode):
         state: np.array
             Current state of the network.
         """
-        rssi = self.packets[0].pRX  # RSSI of the packet
-        normalized_rssi = (rssi - (-137)) / (-70 - (-137))  # Normalize RSSI to [0, 1] range
-        # snr = self.packets[0].snr  # SNR of the packet
-        # prr = self.packetsSuccessful / self.packetsTransmitted if self.packetsTransmitted > 5 else 0  # Packet Reception Rate
-        prr = sum(self.packetsSuccessfulHistory[-100:]) / sum(self.packetsTransmittedHistory[-100:]) if len(self.packetsTransmittedHistory) > 5 else 0  # PRR from the last 100 packets
-        airtime = self.packets[0].rectime/1000  # Airtime of the packet in seconds
-        self.battery_level = self.get_battery_level()
-        state = [normalized_rssi, prr, airtime, self.battery_level, self.energyConsumedByThisPacket]  
-        self.rssiHistory.append(rssi)  # Store the RSSI in the history
-        # self.snrHistory.append(snr)  # Store the SNR in the history
-        if len(self.rssiHistory) > 10:
-            self.rssiHistory.pop(0)
-            # self.snrHistory.pop(0)  # Keep only the last 10 SNR values
+        if getattr(self, '_stateInit', False):
+            state = [1, 0, 5, 0]  # Initial state: [Normalized RSSI, PRR, airtime, Pkt Erg Consumption]
+        else:
+            rssi = self.packets[0].pRX  # RSSI of the packet
+            normalized_rssi = (rssi - (-137)) / (-60 - (-137))  # Normalize RSSI to [0, 1] range
+            # snr = self.packets[0].snr  # SNR of the packet
+            # prr = self.packetsSuccessful / self.packetsTransmitted if self.packetsTransmitted > 5 else 0  # Packet Reception Rate
+            prr = sum(self.packetsSuccessfulHistory[-100:]) / sum(self.packetsTransmittedHistory[-100:]) if len(self.packetsTransmittedHistory) > 5 else 0  # PRR from the last 100 packets
+            airtime = self.packets[0].rectime/1000  # Airtime of the packet in seconds
+            state = [normalized_rssi, prr, airtime, self.energyConsumedByThisPacket]  
+            self.rssiHistory.append(rssi)  # Store the RSSI in the history
+            # self.snrHistory.append(snr)  # Store the SNR in the history
+            if len(self.rssiHistory) > 10:
+                self.rssiHistory.pop(0)
+                # self.snrHistory.pop(0)  # Keep only the last 10 SNR values
         return state
 
     def get_battery_level(self):
@@ -455,7 +455,6 @@ class rlNode(myNode):
 class qlNode(rlNode):
     def __init__(self, nodeid, position, transmitParams, initial, sfSet, freqSet, powSet, bsList, interferenceThreshold, logDistParams, sensi, node_mode, info_mode, horTime, algo, simu_dir, fname):
         super().__init__(nodeid, position, transmitParams, initial, sfSet, freqSet, powSet, bsList, interferenceThreshold, logDistParams, sensi, node_mode, info_mode, horTime, algo, simu_dir, fname)
-        self.loraDrlAgent = LoRaQLAgent(state_size=len(self.previousState), action_size=self.nrActions, sfSet=self.sfSet, powSet=self.powerSet, freqSet=freqSet)
 
     def updateAgent(self):
         # Get the last state from the memory or use a default state
@@ -476,7 +475,27 @@ class qlNode(rlNode):
         self.loraDrlAgent.replay()  # Train the agent with the replay memory
 
 
-class dqnNode(rlNode):
+class sysOptimizerRlNode(rlNode):
     def __init__(self, nodeid, position, transmitParams, initial, sfSet, freqSet, powSet, bsList, interferenceThreshold, logDistParams, sensi, node_mode, info_mode, horTime, algo, simu_dir, fname):
         super().__init__(nodeid, position, transmitParams, initial, sfSet, freqSet, powSet, bsList, interferenceThreshold, logDistParams, sensi, node_mode, info_mode, horTime, algo, simu_dir, fname)
-        self.loraDrlAgent = DQNAgent(state_size=len(self.previousState), action_size=self.nrActions, sfSet=self.sfSet, powSet=self.powerSet, freqSet=self.freqSet)
+
+    def updateAgent(self, prr, avgErgPerPkt):
+        # Get the last state from the memory or use a default state
+        if self.loraDrlAgent.memory.__len__() > 0:
+            # Get the sate from the memory if available otherwise use the default state [1, 0, 5, 1.0]
+            self.previousState = self.loraDrlAgent.memory[-1][3]           
+        current_state = self.get_network_state()
+        reward = self.loraDrlAgent.calculate_reward(prr, avgErgPerPkt, self.packets[0].isLost)  # PRR of the system (in percentage) and energy consumption per packet in Joules
+        print(f"[{self.__class__.__name__} updateAgent] Previous state: {self.previousState}, Current state: {current_state}, Reward: {reward}")
+
+        if self.get_battery_level() <= 0:
+            done = True  # Episode is done if battery is empty
+        else:
+            done = False  # Assuming the episode is not done yet
+
+        self.loraDrlAgent.remember(self.previousState, self.packets[0].chosenAction, reward, current_state, done)
+        self.loraDrlAgent.replay()  # Train the agent with the replay memory
+        # Update target model when the number of successful packets reaches the target update interval
+        if self.packetsSuccessful % self.targetUpdateInterval == 0: 
+            print(f"[{self.__class__.__name__} updateAgent] Updated target model at packetsSuccessful={self.packetsSuccessful}")
+            self.loraDrlAgent.update_target_model()

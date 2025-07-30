@@ -14,7 +14,7 @@ import numpy as np
 from os.path import join
 from .loratools import airtime, dBmTomW
 # Transmit
-def transmitPacket(env, node, bsDict, logDistParams, algo):
+def transmitPacket(env, node, bsDict, logDistParams, algo, ergMonitor=None, prrMonitor=None):
     """ Transmit a packet from node to all BSs in the list.
     Parameters
     ----------
@@ -86,24 +86,36 @@ def transmitPacket(env, node, bsDict, logDistParams, algo):
                 node.addACK(bsDict[bsid].bsid, node.packets[bsid])
                 successfulRx = True
                 
-        # update probability        
+        # update parameters        
         node.packetsTransmitted += 1
         node.energyConsumedByThisPacket = node.packets[0].rectime * dBmTomW(node.packets[0].pTX) * (3.0) /1e6 # V = 3.0     # voltage XXX
         node.energy += node.energyConsumedByThisPacket
+        ergMonitor.totalEnergy += node.energyConsumedByThisPacket
+        # updating the overall average energy per packet by finding the mean based on the energy consumed by the incoming packet  
+        ergMonitor.avgErgPerPkt = (ergMonitor.avgErgPerPkt + node.energyConsumedByThisPacket) / 2  
+        prrMonitor.sysWidePktTx += 1
+
         if successfulRx:
             if node.info_mode in ["NO", "PARTIAL"]:
                 node.packetsSuccessful += 1
                 node.transmitTime += node.packets[0].rectime
+                prrMonitor.sysWideSuccessfulPkt += 1
+                prrMonitor.prrSys = prrMonitor.sysWideSuccessfulPkt / prrMonitor.sysWidePktTx
             elif node.info_mode == "FULL": 
                 if not node.ack[0].isCollision:
                     node.packetsSuccessful += 1
                     node.transmitTime += node.packets[0].rectime
+                    prrMonitor.sysWideSuccessfulPkt += 1
+                    prrMonitor.prrSys = prrMonitor.sysWideSuccessfulPkt / prrMonitor.sysWidePktTx
             if algo=='exp3' or algo=='exp3s':
                 node.updateProb(algo)
         if algo!='exp3' or algo!='exp3s':
             node.packetsTransmittedHistory.append(1)
             node.packetsSuccessfulHistory.append(1 if successfulRx else 0)
-            node.updateAgent()
+            if algo=="DDQN_sysOptim":
+                node.updateAgent(prrMonitor.prrSys, ergMonitor.avgErgPerPkt)
+            else:
+                node.updateAgent()
         # print("[bsFunctions transmitPacket]Probability of action from node " +str(node.nodeid)+ " at (t+1)= {}".format(int(1+env.now/(6*60*1000))))
         # print(node.prob)
         # print(node.weight)

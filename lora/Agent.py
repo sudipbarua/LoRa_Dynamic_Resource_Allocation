@@ -158,10 +158,93 @@ class LoRaQLAgent(AdaptiveResourceAllocation):
     def __init__(self, state_size, action_size, sfSet, powSet, freqSet):
         super().__init__(state_size, action_size, sfSet, powSet, freqSet)
         self.name = "LoRaQLAgent"
+        # Defines the bins for each continuous state parameter.
+        # Example: [[-120,-100,-80,-60], [-10,0,10,20], [0,100,500,1000]]
+        # Each inner list defines the upper bounds of bins for a parameter.
+        self.state_bins = state_bins
+        self.action_size = action_size
+        self.num_channels = len(freqSet) # Number of available channels
 
+        # Calculate the number of discrete states based on the defined bins
+        self.num_discrete_states = 1
+        self.bin_counts = []
+        for bins in self.state_bins:
+            num_bins_for_param = len(bins) + 1 # Number of bins is thresholds + 1
+            self.num_discrete_states *= num_bins_for_param
+            self.bin_counts.append(num_bins_for_param)
         # Q-table: stores Q-values for each state-action pair
         # Initialized with zeros. Dimensions: (num_discrete_states, action_size)
-        self.q_table = np.zeros((self.state_size, self.action_size))
+        self.q_table = np.zeros((self.num_discrete_states, self.action_size))
+
+    def _get_discrete_state(self, continuous_state):
+        """
+        Converts a continuous state vector into a single discrete integer index.
+
+        Args:
+            continuous_state (np.array or list): The continuous state vector (e.g., [RSSI, SNR, Distance]).
+
+        Returns:
+            int: The discrete integer index representing the state.
+        """
+        discrete_indices = []
+        for i, param_value in enumerate(continuous_state):
+            # Find which bin the parameter value falls into
+            # np.digitize returns the index of the bin to which each value belongs.
+            # Bins are defined by `self.state_bins[i]`.
+            # Example: if bins = [-100, -80], value -90 -> index 1 (falls into bin (-100, -80])
+            bin_index = np.digitize(param_value, self.state_bins[i])
+            discrete_indices.append(bin_index)
+
+        # Combine individual discrete indices into a single unique integer
+        # This uses a base-N conversion, where N is the number of bins for each parameter.
+        # Example: if bin_counts = [5, 4, 4] and discrete_indices = [1, 2, 3]
+        # index = (1 * 4 * 4) + (2 * 4) + 3 = 16 + 8 + 3 = 27
+        discrete_state_index = 0
+        multiplier = 1
+        for i in reversed(range(len(discrete_indices))):
+            discrete_state_index += discrete_indices[i] * multiplier
+            multiplier *= self.bin_counts[i] # Multiply by the number of bins in the current dimension
+
+        # Ensure the index is within bounds of the Q-table
+        return int(np.clip(discrete_state_index, 0, self.num_discrete_states - 1))
+    
+    def remember(self, state, action, reward, next_state, done):
+        """
+        Stores an experience tuple (state, action, reward, next_state, done) in the replay memory.
+        States are discretized before storage.
+
+        Args:
+            state (np.array): The current continuous state.
+            action (int): The action taken.
+            reward (float): The reward received.
+            next_state (np.array): The next continuous state.
+            done (bool): True if the episode has ended, False otherwise.
+        """
+        discrete_state = self._get_discrete_state(state)
+        discrete_next_state = self._get_discrete_state(next_state)
+        self.memory.append((discrete_state, action, reward, discrete_next_state, done))
+
+    def act(self, continuous_state):
+        """
+        Selects an action based on the current continuous state using an epsilon-greedy policy.
+        The continuous state is first discretized.
+
+        Args:
+            continuous_state (np.array): The current continuous state.
+
+        Returns:
+            int: The index of the selected action.
+        """
+        discrete_state = self._get_discrete_state(continuous_state)
+
+        # Epsilon-greedy action selection: explore randomly or exploit learned Q-values
+        if np.random.rand() <= self.epsilon:
+            print("[LoRaQLearningAgent act] Random action selected")
+            return random.randrange(self.action_size)
+
+        print("[LoRaQLearningAgent act] Selecting action from Q-table based on discrete state")
+        # Exploit: choose the action with the highest Q-value for the current discrete state
+        return np.argmax(self.q_table[discrete_state, :])
 
     def replay(self):
         # Updating the Q-table using the Bellman equation
@@ -253,6 +336,15 @@ class DQNAgent(AdaptiveResourceAllocation):
             self.epsilon *= self.epsilon_decay
             # print(f"[LoRaDRL replay] Epsilon decayed to {self.epsilon}")
 
+
+class AraSysOptimizerAgent(AdaptiveResourceAllocation):
+    def __init__(self, state_size, action_size, sfSet, powSet, freqSet):
+        super().__init__(state_size, action_size, sfSet, powSet, freqSet)
+        self.alpha = 10  # Tuning parameter for PRR
+        self.gamma_p = 100  # Tuning parameter for energy consumption 
+
+    def calculate_reward(self, prrSys, avgErgPerPkt, pktLost):
+        return (self.alpha * prrSys * int(not pktLost)) / (self.gamma_p * avgErgPerPkt)
 
 ########## test script ##########
 def main():
