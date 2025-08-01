@@ -148,10 +148,7 @@ class AdaptiveResourceAllocation(LoRaDRL):
         return super()._build_model()
 
     def calculate_reward(self, PDR, airtime, pktLost):
-        if pktLost:
-            return -10.0  # Negative reward for lost packets
-        else:
-            return super().calculate_reward(PDR, airtime)
+        return (PDR * self.alpha * int(not pktLost)) / (self.beta * airtime)
 
 
 class LoRaQLAgent(AdaptiveResourceAllocation):
