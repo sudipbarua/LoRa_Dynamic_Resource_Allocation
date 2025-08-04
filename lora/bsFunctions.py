@@ -90,7 +90,6 @@ def transmitPacket(env, node, bsDict, logDistParams, algo, ergMonitor=None, prrM
         node.packetsTransmitted += 1
         node.energyConsumedByThisPacket = node.packets[0].rectime * dBmTomW(node.packets[0].pTX) * (3.0) /1e6 # V = 3.0     # voltage XXX
         node.energy += node.energyConsumedByThisPacket
-        ergMonitor.totalEnergy += node.energyConsumedByThisPacket
         # updating the overall average energy per packet by finding the mean based on the energy consumed by the incoming packet  
         ergMonitor.avgErgPerPkt = (ergMonitor.avgErgPerPkt + node.energyConsumedByThisPacket) / 2  
         prrMonitor.sysWidePktTx += 1
@@ -136,6 +135,33 @@ def cuckooClock(env):
         yield env.timeout(1000 * 3600000)
         print("Running {} kHrs".format(env.now/(1000 * 3600000)))
 
+def saveAvgEnergyPerPacket(env, ergMonitor, fname, simu_dir):
+    """ Save average energy per packet to file
+    Parameters
+    ----------
+    env : simpy environement
+        Simulation environment.
+    ergMonitor: ergMonitor
+        Energy monitor object.
+    fname: string
+        file name structure
+    simu_dir: string
+        folder
+    Returns
+    -------
+    """
+    while True:
+        yield env.timeout(100 * 3600000)
+        # write average energy per packet to file
+        filename = join(simu_dir, str('avgEnergyPerPacket_'+ fname) + '.csv')
+        if os.path.isfile(filename):
+            res = "\n" + str(ergMonitor.avgErgPerPkt)
+        else:
+            res = str(ergMonitor.avgErgPerPkt)
+        with open(filename, "a") as myfile:
+            myfile.write(res)
+        myfile.close()
+
 def saveProb(env, nodeDict, fname, simu_dir):
     """ Save probabilities every to file
     Parameters
@@ -165,6 +191,38 @@ def saveProb(env, nodeDict, fname, simu_dir):
                 with open(filename, "a") as myfile:
                     myfile.write(res)
                 myfile.close()
+
+def saveTxParams(env, nodeDict, fname, simu_dir):
+    """ Save transmission parameters to file
+    Parameters
+    ----------
+    env : simpy environement
+        Simulation environment.
+    nodeDict:dict
+        list of nodes.
+    fname: string
+        file name structure
+    simu_dir: string
+        folder
+    Returns
+    -------
+    """
+    txParamDir = join(simu_dir, "txParams")
+    if not os.path.exists(txParamDir):
+        os.makedirs(txParamDir)
+    while True:
+        yield env.timeout(100 * 3600000)
+        # write tx params to file
+        for nodeid in nodeDict.keys():
+            filename = join(txParamDir, str('txParams_'+ fname) + '_id_' + str(nodeid) + '.csv')
+            save = str(nodeid) + " " + str(nodeDict[nodeid].packets[0].dist) + " " + str(nodeDict[nodeid].packets[0].sf) + " " + str(nodeDict[nodeid].packets[0].freq) + " " + str(nodeDict[nodeid].packets[0].pTX)
+            if os.path.isfile(filename):
+                res = "\n" + save
+            else:
+                res = save
+            with open(filename, "a") as myfile:
+                myfile.write(res)
+            myfile.close()
 
 def savePRRlastFew(env, nodeDict, fname, simu_dir):
     """ Save packet reception ratio of last 100 or 1000 packets 

@@ -14,7 +14,7 @@ from os import makedirs
 import simpy
 from .node import myNode, rlNode, qlNode, sysOptimizerRlNode
 from .bs import myBS
-from .bsFunctions import transmitPacket, cuckooClock, saveProb, saveRatio, saveEnergy, saveTraffic, savePRRlastFew
+from .bsFunctions import transmitPacket, cuckooClock, saveProb, saveRatio, saveEnergy, saveTraffic, savePRRlastFew, saveAvgEnergyPerPacket, saveTxParams
 from .loratools import dBmTomW, getMaxTransmitDistance, placeRandomlyInRange, placeRandomly
 from .plotting import plotLocations
 from .Agent import LoRaDRL, AdaptiveResourceAllocation, LoRaQLAgent, DQNAgent, AraSysOptimizerAgent
@@ -23,7 +23,6 @@ from .Agent import LoRaDRL, AdaptiveResourceAllocation, LoRaQLAgent, DQNAgent, A
 class EnergyMonitor():
     # Energy monitor for the overall system
     def __init__(self):
-        self.totalEnergy = 0
         self.avgErgPerPkt = 0.01
 
 
@@ -249,6 +248,8 @@ def sim(nrNodes, nrIntNodes, nrBS, initial, radius, distribution, avgSendTime, h
         env.process(saveProb(env, nodeDict, fname, simu_dir))
     else:
         env.process(savePRRlastFew(env, nodeDict, fname, simu_dir))
+    env.process(saveTxParams(env, nodeDict, fname, simu_dir))
+    env.process(saveAvgEnergyPerPacket(env, erg_monitor, fname, simu_dir))
     env.process(saveRatio(env, nodeDict, fname, simu_dir))
     env.process(saveEnergy(env, nodeDict, fname, simu_dir))
     env.process(saveTraffic(env, nodeDict, fname, simu_dir, sfSet, freqSet, lambda_i, lambda_e))

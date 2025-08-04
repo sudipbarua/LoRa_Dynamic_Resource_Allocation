@@ -355,10 +355,10 @@ class rlNode(myNode):
         for i in range(6):
             if dist <= distMatrix[0, 0]:
                 minSF = 7
-                minPower = min(powSet)
+                minPower = 2
             elif distMatrix[i, 0 ]<= dist < distMatrix[i+1, 0]:
                 minSF = (i + 1) + 7
-                minPower = powSet[i] if i < len(powSet) else powSet[-1]
+                minPower = (i + 1)*2 + 2
         tempSF = [sf for sf in sfSet if sf >= minSF]
         tempPow = [pow for pow in powSet if pow >= minPower]
         sfBuckets.extend(tempSF)
