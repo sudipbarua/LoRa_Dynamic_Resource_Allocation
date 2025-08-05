@@ -500,7 +500,7 @@ class sysOptimizerRlNode(rlNode):
             print(f"[{self.__class__.__name__} updateAgent] Updated target model at packetsSuccessful={self.packetsSuccessful}")
             self.loraDrlAgent.update_target_model()
 
-class masterAgentRlNode(rlNode):
+class masterAgentRlNode(sysOptimizerRlNode):
     def __init__(self, nodeid, position, transmitParams, initial, sfSet, freqSet, powSet, bsList, interferenceThreshold, logDistParams, sensi, node_mode, info_mode, horTime, algo, simu_dir, fname):
         print(f"[myNode __init__] nodeid={nodeid}, position={position}, node_mode={node_mode}, info_mode={info_mode}, algo={algo}")
         self.nodeid = nodeid # id

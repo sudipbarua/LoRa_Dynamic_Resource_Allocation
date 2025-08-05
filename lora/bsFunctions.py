@@ -111,7 +111,7 @@ def transmitPacket(env, node, bsDict, logDistParams, algo, ergMonitor=None, prrM
         if algo!='exp3' or algo!='exp3s':
             node.packetsTransmittedHistory.append(1)
             node.packetsSuccessfulHistory.append(1 if successfulRx else 0)
-            if algo=="DDQN_sysOptim":
+            if algo=="DDQN_sysOptim" or algo=="masterAgent":
                 node.updateAgent(prrMonitor.prrSys, ergMonitor.avgErgPerPkt)
             else:
                 node.updateAgent()

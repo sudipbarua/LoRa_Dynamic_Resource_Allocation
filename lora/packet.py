@@ -109,7 +109,7 @@ class myPacket():
         else:
             self.isLost = True
             print("[myPacket updateTXSettings] pRX", self.pRX)
-            print("[myPacket updateTXSettings] Node " + str(self.nodeid) + ": packet is lost (smaller than RSSI)!")
+            print("[myPacket updateTXSettings] Node " + str(self.nodeid) + ": packet is lost (smaller than RSSI theshold)!")
    
         self.isCritical = False
         
@@ -205,6 +205,6 @@ class rlPacket(myPacket):
         else:
             self.isLost = True
             print(f"[{self.__class__.__name__} updateTXSettings] pRX", self.pRX)
-            print(f"[{self.__class__.__name__} updateTXSettings] Node " + str(self.nodeid) + ": packet is lost (smaller than RSSI)!")
+            print(f"[{self.__class__.__name__} updateTXSettings] Node " + str(self.nodeid) + ": packet is lost (smaller than RSSI theshold)!")
    
         self.isCritical = False
