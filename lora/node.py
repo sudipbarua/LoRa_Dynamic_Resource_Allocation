@@ -500,7 +500,7 @@ class sysOptimizerRlNode(rlNode):
             print(f"[{self.__class__.__name__} updateAgent] Updated target model at packetsSuccessful={self.packetsSuccessful}")
             self.loraDrlAgent.update_target_model()
 
-class masterAgentRlNode(sysOptimizerRlNode):
+class masterAgentRlNode(rlNode):
     def __init__(self, nodeid, position, transmitParams, initial, sfSet, freqSet, powSet, bsList, interferenceThreshold, logDistParams, sensi, node_mode, info_mode, horTime, algo, simu_dir, fname):
         print(f"[myNode __init__] nodeid={nodeid}, position={position}, node_mode={node_mode}, info_mode={info_mode}, algo={algo}")
         self.nodeid = nodeid # id
@@ -531,7 +531,7 @@ class masterAgentRlNode(sysOptimizerRlNode):
         self._stateInit = False
 
         self.algo = algo
-        self.targetUpdateInterval = 100  # Update target model every 100 successful packets
+        self.targetUpdateInterval = 500  # Update target model every 500 successful packets
         self.packets = {}
         # measurement params
         self.packetNumber = 0
@@ -553,3 +553,23 @@ class masterAgentRlNode(sysOptimizerRlNode):
             airtime = self.packets[0].rectime/1000  # Airtime of the packet in seconds
             state = [normalized_dist, normalized_rssi, prr, airtime, self.energyConsumedByThisPacket]  
         return state
+    
+    def updateAgent(self, prr, avgErgPerPkt, sysWideRxPktSuccess):
+        # Get the last state from the memory or use a default state
+        if self.loraDrlAgent.memory.__len__() > 0:
+            self.previousState = self.loraDrlAgent.memory[-1][3]           
+        current_state = self.get_network_state()
+        reward = self.loraDrlAgent.calculate_reward(prr, avgErgPerPkt, self.packets[0].isLost)  # PRR of the system (in percentage) and energy consumption per packet in Joules
+        print(f"[{self.__class__.__name__} updateAgent] Previous state: {self.previousState}, Current state: {current_state}, Reward: {reward}")
+
+        if self.get_battery_level() <= 0:
+            done = True  # Episode is done if battery is empty
+        else:
+            done = False  # Assuming the episode is not done yet
+
+        self.loraDrlAgent.remember(self.previousState, self.packets[0].chosenAction, reward, current_state, done)
+        self.loraDrlAgent.replay()  # Train the agent with the replay memory
+        # Update target model when the number of systemwide successful packets reaches the target update interval
+        if sysWideRxPktSuccess % self.targetUpdateInterval == 0: 
+            print(f"[{self.__class__.__name__} updateAgent] Updated target model at packetsSuccessful={self.packetsSuccessful}")
+            self.loraDrlAgent.update_target_model()

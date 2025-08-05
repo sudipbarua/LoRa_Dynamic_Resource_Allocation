@@ -111,8 +111,10 @@ def transmitPacket(env, node, bsDict, logDistParams, algo, ergMonitor=None, prrM
         if algo!='exp3' or algo!='exp3s':
             node.packetsTransmittedHistory.append(1)
             node.packetsSuccessfulHistory.append(1 if successfulRx else 0)
-            if algo=="DDQN_sysOptim" or algo=="masterAgent":
+            if algo=="DDQN_sysOptim":
                 node.updateAgent(prrMonitor.prrSys, ergMonitor.avgErgPerPkt)
+            elif algo=="masterAgent":
+                node.updateAgent(prrMonitor.prrSys, ergMonitor.avgErgPerPkt, prrMonitor.sysWideSuccessfulPkt)
             else:
                 node.updateAgent()
         # print("[bsFunctions transmitPacket]Probability of action from node " +str(node.nodeid)+ " at (t+1)= {}".format(int(1+env.now/(6*60*1000))))
