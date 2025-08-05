@@ -499,3 +499,57 @@ class sysOptimizerRlNode(rlNode):
         if self.packetsSuccessful % self.targetUpdateInterval == 0: 
             print(f"[{self.__class__.__name__} updateAgent] Updated target model at packetsSuccessful={self.packetsSuccessful}")
             self.loraDrlAgent.update_target_model()
+
+class masterAgentRlNode(rlNode):
+    def __init__(self, nodeid, position, transmitParams, initial, sfSet, freqSet, powSet, bsList, interferenceThreshold, logDistParams, sensi, node_mode, info_mode, horTime, algo, simu_dir, fname):
+        print(f"[myNode __init__] nodeid={nodeid}, position={position}, node_mode={node_mode}, info_mode={info_mode}, algo={algo}")
+        self.nodeid = nodeid # id
+        self.x, self.y = position # location
+        self.node_mode = "SMART"
+        self.info_mode = info_mode # 'no', 'partial', 'full'
+        self.bw = int(transmitParams[2])
+        self.period = float(transmitParams[9])
+        self.pTXmax = max(powSet) # max transmit power
+        self.sensi = sensi
+
+        print(f"[myNode __init__] bw={self.bw}, period={self.period}, pTXmax={self.pTXmax}")
+
+        # generate proximateBS
+        self.proximateBS = self.generateProximateBS(bsList, interferenceThreshold, logDistParams)
+        # print(f"[myNode __init__] Generated proximateBS: {self.proximateBS}")
+
+        # set of actions
+        self.freqSet, self.sfSet, self.powerSet = freqSet, sfSet, powSet
+        self.setActions = [(self.sfSet[i], self.freqSet[j], self.powerSet[k]) for i in range(len(self.sfSet)) for j in range(len(self.freqSet)) for k in range(len(self.powerSet))]
+        self.nrActions = len(self.setActions)
+        print(f"[myNode __init__] setActions: {self.setActions}")
+        
+        self.packetsSuccessfulHistory = []  # Store successful packets history
+        self.packetsTransmittedHistory = []  # Store transmitted packets history
+        self._stateInit = True
+        self.previousState = self.get_network_state()
+        self._stateInit = False
+
+        self.algo = algo
+        self.targetUpdateInterval = 100  # Update target model every 100 successful packets
+        self.packets = {}
+        # measurement params
+        self.packetNumber = 0
+        self.packetsTransmitted = 0
+        self.packetsSuccessful = 0
+        self.transmitTime = 0
+        self.energy = 0
+        self.energyConsumedByThisPacket = 0  # Energy consumed for the last packet in joules
+
+    def get_network_state(self):
+        if getattr(self, '_stateInit', False):
+            state = [1, 1, 0, 5, 0]  # Initial state: [Normalized dist, Normalized RSSI, PRR, airtime, Pkt Erg Consumption]
+        else:
+            dist = self.packets[0].dist # Distance from the base station
+            normalized_dist = dist / 1000 # Distance in KM
+            rssi = self.packets[0].pRX  # RSSI of the packet
+            normalized_rssi = (rssi - (-137)) / (-60 - (-137))  # Normalize RSSI to [0, 1] range
+            prr = sum(self.packetsSuccessfulHistory[-100:]) / sum(self.packetsTransmittedHistory[-100:]) if len(self.packetsTransmittedHistory) > 5 else 0  # PRR from the last 100 packets
+            airtime = self.packets[0].rectime/1000  # Airtime of the packet in seconds
+            state = [normalized_dist, normalized_rssi, prr, airtime, self.energyConsumedByThisPacket]  
+        return state

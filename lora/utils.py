@@ -12,7 +12,7 @@ import numpy as np
 from os.path import join, exists
 from os import makedirs
 import simpy
-from .node import myNode, rlNode, qlNode, sysOptimizerRlNode
+from .node import myNode, rlNode, qlNode, sysOptimizerRlNode, masterAgentRlNode
 from .bs import myBS
 from .bsFunctions import transmitPacket, cuckooClock, saveProb, saveRatio, saveEnergy, saveTraffic, savePRRlastFew, saveAvgEnergyPerPacket, saveTxParams
 from .loratools import dBmTomW, getMaxTransmitDistance, placeRandomlyInRange, placeRandomly
@@ -191,6 +191,13 @@ def sim(nrNodes, nrIntNodes, nrBS, initial, radius, distribution, avgSendTime, h
     prr_monitor = PrrMonitor()
 
     nodeDict = {} # setup empty dictionary for nodes
+    if algo=="masterAgent":
+        # Common agent for all nodes
+        drlAgent = AraSysOptimizerAgent(
+            state_size=5,
+            action_size=len(sfSet) * len(freqSet) * len(powSet),
+            sfSet=sfSet, powSet=powSet, freqSet=freqSet
+        )
     for elem in nodeList:
         transmitParams = elem[3:13]
         if algo=="exp3" or algo=="exp3s":
@@ -217,6 +224,10 @@ def sim(nrNodes, nrIntNodes, nrBS, initial, radius, distribution, avgSendTime, h
                     sfSet=node.sfSet, powSet=node.powerSet, 
                     freqSet=node.freqSet
                 )
+
+            elif algo=="masterAgent":
+                node = masterAgentRlNode(int(elem[0]), (elem[1], elem[2]), transmitParams, initial, sfSet, freqSet, powSet,
+                            BSList, interferenceThreshold, logDistParams, sensi, elem[13], info_mode, horTime, algo, simu_dir, fname)
         
             else: 
                 node = rlNode(int(elem[0]), (elem[1], elem[2]), transmitParams, initial, sfSet, freqSet, powSet,
