@@ -153,6 +153,12 @@ class myPacket():
         #print(signal)
         return {freqBuckets[0]:signal}
     
+    def getPktAirtime(self):
+        # Airtime of the packet in seconds
+        return airtime([self.sf, self.rdd, self.bw, self.packetLength, 
+                        self.preambleLength, self.syncLength, self.headerEnable, 
+                        self.crc])
+
 
 class rlPacket(myPacket):
     """ LPWAN Simulator: ddqnPacket

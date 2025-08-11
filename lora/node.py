@@ -391,9 +391,9 @@ class rlNode(myNode):
         current_state = self.get_network_state()
         prr = current_state[1]  # PRR from the current state
         if self.algo == 'DDQN_LORADRL':
-            reward = self.loraDrlAgent.calculate_reward(prr, self.packets[0].rectime/1000)  # PRR (in percentage) and airtime(converted to seconds)
+            reward = self.loraDrlAgent.calculate_reward(prr, self.packets[0].getPktAirtime()/1000)  # PRR (in percentage) and airtime(converted to seconds)
         else:
-            reward = self.loraDrlAgent.calculate_reward(prr, self.packets[0].rectime/1000, self.packets[0].isLost)
+            reward = self.loraDrlAgent.calculate_reward(prr, self.packets[0].getPktAirtime()/1000, self.packets[0].isLost)
         print(f"[{self.__class__.__name__} updateAgent] Previous state: {self.previousState}, Current state: {current_state}, Reward: {reward}")
 
         if self.get_battery_level() <= 0:
@@ -428,8 +428,8 @@ class rlNode(myNode):
             # snr = self.packets[0].snr  # SNR of the packet
             # prr = self.packetsSuccessful / self.packetsTransmitted if self.packetsTransmitted > 5 else 0  # Packet Reception Rate
             prr = sum(self.packetsSuccessfulHistory[-100:]) / sum(self.packetsTransmittedHistory[-100:]) if len(self.packetsTransmittedHistory) > 5 else 0  # PRR from the last 100 packets
-            airtime = self.packets[0].rectime/1000  # Airtime of the packet in seconds
-            state = [normalized_rssi, prr, airtime, self.energyConsumedByThisPacket]  
+            pkt_toa = self.packets[0].getPktAirtime()  # Airtime of the packet in seconds
+            state = [normalized_rssi, prr, pkt_toa, self.energyConsumedByThisPacket]  
             self.rssiHistory.append(rssi)  # Store the RSSI in the history
             # self.snrHistory.append(snr)  # Store the SNR in the history
             if len(self.rssiHistory) > 10:
@@ -455,7 +455,59 @@ class rlNode(myNode):
 class qlNode(rlNode):
     def __init__(self, nodeid, position, transmitParams, initial, sfSet, freqSet, powSet, bsList, interferenceThreshold, logDistParams, sensi, node_mode, info_mode, horTime, algo, simu_dir, fname):
         super().__init__(nodeid, position, transmitParams, initial, sfSet, freqSet, powSet, bsList, interferenceThreshold, logDistParams, sensi, node_mode, info_mode, horTime, algo, simu_dir, fname)
+        self.nDiscreteStates = 12 * 21 * 23 * 17  # Number of discrete states: RSSI bins (12) * PRR bins (21) * Airtime bins (23) * Energy bins (17)
 
+    def get_network_state(self):
+        # insted of usinng the discretinzaiton at the agent end we do it here
+        if getattr(self, '_stateInit', False):
+            state = [0, 0, 1, 1]  # Initial state: Bin index of [RSSI, PRR, airtime, Pkt Erg Consumption]
+        else:
+            rssi = self.packets[0].pRX  # RSSI of the packet
+            rssi_bin =  self.rssiToBin(rssi)  # bin index of the RSSI (0 to 11)
+            prr = sum(self.packetsSuccessfulHistory[-100:]) / sum(self.packetsTransmittedHistory[-100:]) if len(self.packetsTransmittedHistory) > 5 else 0  # PRR from the last 100 packets
+            prr_bin = int(prr * 20)  # PRR bin index (0 to 20)
+            # Airtime of the packet in seconds
+            pkt_toa = self.packets[0].getPktAirtime()/1000
+            airtime_bin = self.airtimeToBin(pkt_toa)  # Airtime bin index (1 to 23)
+            pkt_erg_bin = self.energyToBin(self.energyConsumedByThisPacket)  # Energy bin index (1 to 17)
+            state = [rssi_bin, prr_bin, airtime_bin, pkt_erg_bin]  
+            self.rssiHistory.append(rssi)  # Store the RSSI in the history
+            # self.snrHistory.append(snr)  # Store the SNR in the history
+            if len(self.rssiHistory) > 10:
+                self.rssiHistory.pop(0)
+                # self.snrHistory.pop(0)  # Keep only the last 10 SNR values
+        return state
+    
+    def rssiToBin(self, rssi):
+        max_rssi = -30
+        min_rssi = -140
+        step = 10
+        # Clip RSSI to range
+        rssi = max(min_rssi, min(max_rssi, rssi))
+        # Compute bin index
+        bin_index = int((max_rssi - rssi) // step)
+        return bin_index
+    
+    def airtimeToBin(sellf, toa):
+        max_toa = 2.3
+        min_toa = 0.1
+        step = 0.1 
+        # Clip Time on Air range 
+        toa = max(min_toa, min(max_toa, toa))
+        # Compute bin index
+        bin_index = int(toa // step)
+        return bin_index
+    
+    def energyToBin(self, energy):
+        max_energy = 0.17
+        min_energy = 0.01
+        step = 0.01
+        # Clip energy to range
+        energy = max(min_energy, min(max_energy, energy))
+        # Compute bin index
+        bin_index = int(energy // step)
+        return bin_index
+    
     def updateAgent(self):
         # Get the last state from the memory or use a default state
         if self.loraDrlAgent.memory.__len__() > 0:
@@ -463,7 +515,7 @@ class qlNode(rlNode):
             self.previousState = self.loraDrlAgent.memory[-1][3]           
         current_state = self.get_network_state()
         prr = current_state[1]  # PRR from the current state
-        reward = self.loraDrlAgent.calculate_reward(prr, self.packets[0].rectime/1000, self.packets[0].isLost)
+        reward = self.loraDrlAgent.calculate_reward(prr, self.packets[0].getPktAirtime()/1000, self.packets[0].isLost)
         # print(f"[{self.__class__.__name__} updateAgent] Previous state: {self.previousState}, Current state: {current_state}, Reward: {reward}")
 
         if self.get_battery_level() <= 0:
@@ -473,6 +525,9 @@ class qlNode(rlNode):
 
         self.loraDrlAgent.remember(self.previousState, self.packets[0].chosenAction, reward, current_state, done)
         self.loraDrlAgent.replay()  # Train the agent with the replay memory
+        if self.packetsSuccessful % self.targetUpdateInterval == 0:
+            # Use the update interval for epsilon decay
+            self.loraDrlAgent.decay_epsilon()
 
 
 class sysOptimizerRlNode(rlNode):
@@ -550,7 +605,7 @@ class masterAgentRlNode(rlNode):
             rssi = self.packets[0].pRX  # RSSI of the packet
             normalized_rssi = (rssi - (-137)) / (-60 - (-137))  # Normalize RSSI to [0, 1] range
             prr = sum(self.packetsSuccessfulHistory[-100:]) / sum(self.packetsTransmittedHistory[-100:]) if len(self.packetsTransmittedHistory) > 5 else 0  # PRR from the last 100 packets
-            airtime = self.packets[0].rectime/1000  # Airtime of the packet in seconds
+            airtime = self.packets[0].getPktAirtime()/1000  # Airtime of the packet in seconds
             state = [normalized_dist, normalized_rssi, prr, airtime, self.energyConsumedByThisPacket]  
         return state
     

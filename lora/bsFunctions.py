@@ -88,7 +88,7 @@ def transmitPacket(env, node, bsDict, logDistParams, algo, ergMonitor=None, prrM
                 
         # update parameters        
         node.packetsTransmitted += 1
-        node.energyConsumedByThisPacket = node.packets[0].rectime * dBmTomW(node.packets[0].pTX) * (3.0) /1e6 # V = 3.0     # voltage XXX
+        node.energyConsumedByThisPacket = node.packets[0].getPktAirtime() * dBmTomW(node.packets[0].pTX) * (3.0) /1e6 # V = 3.0     # voltage XXX
         node.energy += node.energyConsumedByThisPacket
         # updating the overall average energy per packet by finding the mean based on the energy consumed by the incoming packet  
         ergMonitor.avgErgPerPkt = (ergMonitor.avgErgPerPkt + node.energyConsumedByThisPacket) / 2  
@@ -97,13 +97,13 @@ def transmitPacket(env, node, bsDict, logDistParams, algo, ergMonitor=None, prrM
         if successfulRx:
             if node.info_mode in ["NO", "PARTIAL"]:
                 node.packetsSuccessful += 1
-                node.transmitTime += node.packets[0].rectime
+                node.transmitTime += node.packets[0].getPktAirtime()
                 prrMonitor.sysWideSuccessfulPkt += 1
                 prrMonitor.prrSys = prrMonitor.sysWideSuccessfulPkt / prrMonitor.sysWidePktTx
             elif node.info_mode == "FULL": 
                 if not node.ack[0].isCollision:
                     node.packetsSuccessful += 1
-                    node.transmitTime += node.packets[0].rectime
+                    node.transmitTime += node.packets[0].getPktAirtime()
                     prrMonitor.sysWideSuccessfulPkt += 1
                     prrMonitor.prrSys = prrMonitor.sysWideSuccessfulPkt / prrMonitor.sysWidePktTx
             if algo=='exp3' or algo=='exp3s':

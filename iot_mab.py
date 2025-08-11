@@ -35,7 +35,7 @@ def main(args):
     
     # running simulation
     bsDict, nodeDict = sim(nrNodes, nrIntNodes, nrBS, initial, radius, distribution, avgSendTime, horTime,
-    packetLength, sfSet, freqSet, powSet, captureEffect, interSFInterference, info_mode, algo, logdir, exp_name)
+                           packetLength, sfSet, freqSet, powSet, captureEffect, interSFInterference, info_mode, algo, logdir, exp_name)
 
     return bsDict, nodeDict
 
@@ -54,7 +54,7 @@ if __name__ == '__main__':
         distribution='0.2 0.2 0.2 0.2 0.1 0.1',
         # distribution='1', 
         AvgSendTime= 15*60e3,  # 15 minutes in ms
-        horizonTime= 1400,
+        horizonTime= 14000,
         packetLength=50,
         sfSet='7 8 9 10 11 12',  # Example spreading factors
         # sfSet='7 9 12',
@@ -65,8 +65,8 @@ if __name__ == '__main__':
         captureEffect=1,
         interSFInterference=1,
         infoMode='FULL',  # NO, PARTIAL, FULL
-        Algo='masterAgent',  # exp3, exp3s, DDQN_LORADRL, DDQN_ARA, QL_ARA, DQN_ARA, DDQN_sysOptim
-        exp_name='masterAgent_test',
+        Algo='QL_ARA',  # exp3, exp3s, DDQN_LORADRL, DDQN_ARA, QL_ARA, DQN_ARA, DDQN_sysOptim
+        exp_name='QL_ARA_test',
         logdir='./all_experiments/exp3sVSddqn'
     )
     main(args)

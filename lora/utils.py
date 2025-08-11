@@ -213,7 +213,8 @@ def sim(nrNodes, nrIntNodes, nrBS, initial, radius, distribution, avgSendTime, h
                     state_size=len(node.previousState),
                     action_size=node.nrActions, 
                     sfSet=node.sfSet, powSet=node.powerSet, 
-                    freqSet=node.freqSet
+                    freqSet=node.freqSet,
+                    nDiscreteStates=node.nDiscreteStates
                 )
             elif algo=="DDQN_sysOptim":
                 node = sysOptimizerRlNode(int(elem[0]), (elem[1], elem[2]), transmitParams, initial, sfSet, freqSet, powSet,
