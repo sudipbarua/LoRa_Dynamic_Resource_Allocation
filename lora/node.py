@@ -456,6 +456,7 @@ class qlNode(rlNode):
     def __init__(self, nodeid, position, transmitParams, initial, sfSet, freqSet, powSet, bsList, interferenceThreshold, logDistParams, sensi, node_mode, info_mode, horTime, algo, simu_dir, fname):
         super().__init__(nodeid, position, transmitParams, initial, sfSet, freqSet, powSet, bsList, interferenceThreshold, logDistParams, sensi, node_mode, info_mode, horTime, algo, simu_dir, fname)
         self.nDiscreteStates = 12 * 21 * 23 * 17  # Number of discrete states: RSSI bins (12) * PRR bins (21) * Airtime bins (23) * Energy bins (17)
+        self.prr = 0  # Packet Reception Rate
 
     def get_network_state(self):
         # insted of usinng the discretinzaiton at the agent end we do it here
@@ -464,8 +465,8 @@ class qlNode(rlNode):
         else:
             rssi = self.packets[0].pRX  # RSSI of the packet
             rssi_bin =  self.rssiToBin(rssi)  # bin index of the RSSI (0 to 11)
-            prr = sum(self.packetsSuccessfulHistory[-100:]) / sum(self.packetsTransmittedHistory[-100:]) if len(self.packetsTransmittedHistory) > 5 else 0  # PRR from the last 100 packets
-            prr_bin = int(prr * 20)  # PRR bin index (0 to 20)
+            self.prr = sum(self.packetsSuccessfulHistory[-100:]) / sum(self.packetsTransmittedHistory[-100:]) if len(self.packetsTransmittedHistory) > 5 else 0  # PRR from the last 100 packets
+            prr_bin = int(self.prr * 20)  # PRR bin index (0 to 20)
             # Airtime of the packet in seconds
             pkt_toa = self.packets[0].getPktAirtime()/1000
             airtime_bin = self.airtimeToBin(pkt_toa)  # Airtime bin index (1 to 23)
@@ -524,7 +525,7 @@ class qlNode(rlNode):
             done = False  # Assuming the episode is not done yet
 
         self.loraDrlAgent.remember(self.previousState, self.packets[0].chosenAction, reward, current_state, done)
-        self.loraDrlAgent.replay()  # Train the agent with the replay memory
+        self.loraDrlAgent.replay()  # Update the QL agent using the replay memory
         self.loraDrlAgent.decay_epsilon()
 
 

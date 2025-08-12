@@ -141,8 +141,8 @@ class AdaptiveResourceAllocation(LoRaDRL):
         self.power_levels = powSet  
         self.channels = freqSet
         # Relative constants for assigning weights to different components of the reward function
-        self.alpha = 10.0   # hyperparameter for tuning PDR
-        self.beta = 0.5   # hyperparameter for tuning airtime
+        self.alpha = 1   # hyperparameter for tuning PDR
+        self.beta = 1   # hyperparameter for tuning airtime
         
     def _build_model(self):
         return super()._build_model()
