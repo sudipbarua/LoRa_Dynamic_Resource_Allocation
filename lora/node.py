@@ -525,9 +525,7 @@ class qlNode(rlNode):
 
         self.loraDrlAgent.remember(self.previousState, self.packets[0].chosenAction, reward, current_state, done)
         self.loraDrlAgent.replay()  # Train the agent with the replay memory
-        if self.packetsSuccessful % self.targetUpdateInterval == 0:
-            # Use the update interval for epsilon decay
-            self.loraDrlAgent.decay_epsilon()
+        self.loraDrlAgent.decay_epsilon()
 
 
 class sysOptimizerRlNode(rlNode):
