@@ -65,8 +65,8 @@ if __name__ == '__main__':
         captureEffect=1,
         interSFInterference=1,
         infoMode='FULL',  # NO, PARTIAL, FULL
-        Algo='QL_ARA',  # exp3, exp3s, DDQN_LORADRL, DDQN_ARA, QL_ARA, DQN_ARA, DDQN_sysOptim
-        exp_name='QL_ARA_test',
+        Algo='DDQN_ARA',  # exp3, exp3s, DDQN_LORADRL, DDQN_ARA, QL_ARA, DQN_ARA, DDQN_sysOptim
+        exp_name='DDQN_ARA_test',
         logdir='./all_experiments/exp3sVSddqn'
     )
     main(args)

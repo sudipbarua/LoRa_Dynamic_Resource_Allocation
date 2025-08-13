@@ -428,7 +428,7 @@ class rlNode(myNode):
             # snr = self.packets[0].snr  # SNR of the packet
             # prr = self.packetsSuccessful / self.packetsTransmitted if self.packetsTransmitted > 5 else 0  # Packet Reception Rate
             prr = sum(self.packetsSuccessfulHistory[-100:]) / sum(self.packetsTransmittedHistory[-100:]) if len(self.packetsTransmittedHistory) > 5 else 0  # PRR from the last 100 packets
-            pkt_toa = self.packets[0].getPktAirtime()  # Airtime of the packet in seconds
+            pkt_toa = self.packets[0].getPktAirtime()/1000  # Airtime of the packet in seconds
             state = [normalized_rssi, prr, pkt_toa, self.energyConsumedByThisPacket]  
             self.rssiHistory.append(rssi)  # Store the RSSI in the history
             # self.snrHistory.append(snr)  # Store the SNR in the history

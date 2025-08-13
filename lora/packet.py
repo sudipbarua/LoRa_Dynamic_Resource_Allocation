@@ -154,7 +154,7 @@ class myPacket():
         return {freqBuckets[0]:signal}
     
     def getPktAirtime(self):
-        # Airtime of the packet in seconds
+        # Airtime of the packet in miliseconds
         return airtime([self.sf, self.rdd, self.bw, self.packetLength, 
                         self.preambleLength, self.syncLength, self.headerEnable, 
                         self.crc])
