@@ -108,7 +108,7 @@ def transmitPacket(env, node, bsDict, logDistParams, algo, ergMonitor=None, prrM
                     prrMonitor.prrSys = prrMonitor.sysWideSuccessfulPkt / prrMonitor.sysWidePktTx
             if algo=='exp3' or algo=='exp3s':
                 node.updateProb(algo)
-        if algo!='exp3' or algo!='exp3s':
+        if algo not in ('exp3', 'exp3s'):
             node.packetsTransmittedHistory.append(1)
             node.packetsSuccessfulHistory.append(1 if successfulRx else 0)
             if algo=="DDQN_sysOptim":
