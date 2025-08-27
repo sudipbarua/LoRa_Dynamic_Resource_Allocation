@@ -1,7 +1,7 @@
 from __future__ import division
 import numpy as np
 from .loratools import getDistanceFromPower
-from .packet import myPacket, rlPacket
+from .packet import myPacket, rlPacket, rlPacketFreqHop, basicPacket
 
 
 class myNode():
@@ -231,12 +231,13 @@ class myNode():
         # print(f"[myNode updateProb] Updated probs: {self.prob}")
 
     def resetACK(self):
-        print(f"[myNode resetACK] nodeid={self.nodeid}")
+        # print(f"[myNode resetACK] nodeid={self.nodeid}")
         self.ack = {}
 
     def addACK(self, bsid, packet):
-        print(f"[myNode addACK] nodeid={self.nodeid}, bsid={bsid}")
         self.ack[bsid] = packet
+        # print(f"[myNode addACK] nodeid={self.nodeid}, bsid={bsid}")
+
 
     def updateTXSettings(self):
         print(f"[myNode updateTXSettings] nodeid={self.nodeid}")
@@ -529,6 +530,80 @@ class qlNode(rlNode):
         self.loraDrlAgent.decay_epsilon()
 
 
+class qlNodeFreqHop(qlNode):
+    def __init__(self, nodeid, position, transmitParams, initial, sfSet, freqSet, powSet, bsList, interferenceThreshold, logDistParams, sensi, node_mode, info_mode, horTime, algo, simu_dir, fname):
+        print(f"[myNode __init__] nodeid={nodeid}, position={position}, node_mode={node_mode}, info_mode={info_mode}, algo={algo}")
+        self.nodeid = nodeid # id
+        self.x, self.y = position # location
+        if node_mode == 0:
+            self.node_mode = initial
+        else:
+            self.node_mode = "SMART"
+        print(f"[myNode __init__] Set node_mode: {self.node_mode}")
+
+        self.info_mode = info_mode # 'no', 'partial', 'full'
+        self.bw = int(transmitParams[2])
+        self.period = float(transmitParams[9])
+        self.pTXmax = max(powSet) # max pTX
+        self.sensi = sensi
+
+        print(f"[myNode __init__] bw={self.bw}, period={self.period}, pTXmax={self.pTXmax}")
+
+        # generate proximateBS
+        self.proximateBS = self.generateProximateBS(bsList, interferenceThreshold, logDistParams)
+        # print(f"[myNode __init__] Generated proximateBS: {self.proximateBS}")
+
+        # set of actions
+        self.freqSet = freqSet
+
+        if self.info_mode == "NO":
+            self.sfSet = sfSet
+            self.powerSet = powSet
+        else:
+            self.sfSet, self.powerSet = self.generateHoppingSfFromDistance(sfSet, powSet, logDistParams)
+        print(f"[myNode __init__] sfSet: {self.sfSet}")
+
+        self.setActions = [(self.sfSet[i], self.powerSet[j]) for i in range(len(self.sfSet)) for j in range(len(self.powerSet))]
+        self.nrActions = len(self.setActions)
+        self.initial = initial
+        print(f"[myNode __init__] setActions: {self.setActions}")
+        print(f"[myNode __init__] nrActions: {self.nrActions}")
+        
+        # Storing the last 'n' states of a node 
+        self.rssiHistory = []  # Store RSSI history for the node
+        # self.snrHistory = []  # Store SNR history for the node
+        self.packetsSuccessfulHistory = []  # Store successful packets history
+        self.packetsTransmittedHistory = []  # Store transmitted packets history
+        self._stateInit = True
+        self.previousState = self.get_network_state()
+        self._stateInit = False
+
+        # initialize LoRaDRL agent
+        self.loraDrlAgent = None  # In the new version we use a setter to set the agent from the outside for modularity 
+        self.algo = algo
+        self.targetUpdateInterval = 100  # Update target model every 100 successful packets
+
+        # generate packet and ack
+        # Unlike the parent class, we only initialize the packets attribute here and initialize in the sim function of utils.py
+        self.packets = {}
+        self.ack = {}
+
+        # measurement params
+        self.packetNumber = 0
+        self.packetsTransmitted = 0
+        self.packetsSuccessful = 0
+        self.transmitTime = 0
+        self.energy = 0
+        self.energyConsumedByThisPacket = 0  # Energy consumed for the last packet in joules
+        self.nDiscreteStates = 12 * 21 * 23 * 17  # Number of discrete states: RSSI bins (12) * PRR bins (21) * Airtime bins (23) * Energy bins (17)
+        self.prr = 0  # Packet Reception Rate
+
+    def generatePacketsToBS(self, transmitParams, logDistParams):
+        for bsid, dist in self.proximateBS.items():
+            self.packets[bsid] = rlPacketFreqHop(self.nodeid, bsid, dist, transmitParams, logDistParams, self.sensi, self.setActions, self.nrActions, self.sfSet, agent=self.loraDrlAgent)
+        print(f"[rlNode generatePacketsToBS] Packets generated: {self.packets}")
+
+
 class sysOptimizerRlNode(rlNode):
     def __init__(self, nodeid, position, transmitParams, initial, sfSet, freqSet, powSet, bsList, interferenceThreshold, logDistParams, sensi, node_mode, info_mode, horTime, algo, simu_dir, fname):
         super().__init__(nodeid, position, transmitParams, initial, sfSet, freqSet, powSet, bsList, interferenceThreshold, logDistParams, sensi, node_mode, info_mode, horTime, algo, simu_dir, fname)
@@ -574,7 +649,7 @@ class masterAgentRlNode(rlNode):
 
         # set of actions
         self.freqSet, self.sfSet, self.powerSet = freqSet, sfSet, powSet
-        self.setActions = [(self.sfSet[i], self.freqSet[j], self.powerSet[k]) for i in range(len(self.sfSet)) for j in range(len(self.freqSet)) for k in range(len(self.powerSet))]
+        self.setActions = [(self.sfSet[i], self.powerSet[j]) for i in range(len(self.sfSet)) for j in range(len(self.powerSet))]
         self.nrActions = len(self.setActions)
         print(f"[myNode __init__] setActions: {self.setActions}")
         
@@ -595,6 +670,11 @@ class masterAgentRlNode(rlNode):
         self.energy = 0
         self.energyConsumedByThisPacket = 0  # Energy consumed for the last packet in joules
 
+    def generatePacketsToBS(self, transmitParams, logDistParams):
+        for bsid, dist in self.proximateBS.items():
+            self.packets[bsid] = rlPacketFreqHop(self.nodeid, bsid, dist, transmitParams, logDistParams, self.sensi, self.setActions, self.nrActions, self.sfSet, agent=self.loraDrlAgent)
+        print(f"[rlNode generatePacketsToBS] Packets generated: {self.packets}")
+
     def get_network_state(self):
         if getattr(self, '_stateInit', False):
             state = [1, 1, 0, 5, 0]  # Initial state: [Normalized dist, Normalized RSSI, PRR, airtime, Pkt Erg Consumption]
@@ -603,7 +683,8 @@ class masterAgentRlNode(rlNode):
             normalized_dist = dist / 1000 # Distance in KM
             rssi = self.packets[0].pRX  # RSSI of the packet
             normalized_rssi = (rssi - (-137)) / (-60 - (-137))  # Normalize RSSI to [0, 1] range
-            prr = sum(self.packetsSuccessfulHistory[-100:]) / sum(self.packetsTransmittedHistory[-100:]) if len(self.packetsTransmittedHistory) > 5 else 0  # PRR from the last 100 packets
+            # prr = sum(self.packetsSuccessfulHistory[-100:]) / sum(self.packetsTransmittedHistory[-100:]) if len(self.packetsTransmittedHistory) > 5 else 0  # PRR from the last 100 packets
+            prr = sum(self.packetsSuccessfulHistory[-100:]) / sum(self.packetsTransmittedHistory[-100:])  # PRR from the last 100 packets
             airtime = self.packets[0].getPktAirtime()/1000  # Airtime of the packet in seconds
             state = [normalized_dist, normalized_rssi, prr, airtime, self.energyConsumedByThisPacket]  
         return state
@@ -627,3 +708,70 @@ class masterAgentRlNode(rlNode):
         if sysWideRxPktSuccess % self.targetUpdateInterval == 0: 
             print(f"[{self.__class__.__name__} updateAgent] Updated target model at packetsSuccessful={self.packetsSuccessful}")
             self.loraDrlAgent.update_target_model()
+
+
+class basicNode(myNode):
+    def __init__(self, nodeid, position, transmitParams, initial, sfSet, freqSet, powSet, bsList, interferenceThreshold, logDistParams, sensi, node_mode, info_mode, horTime, algo, simu_dir, fname):
+        print(f"[myNode __init__] nodeid={nodeid}, position={position}, node_mode={node_mode}, info_mode={info_mode}, algo={algo}")
+        # print(f"[myNode __init__] transmitParams: {transmitParams}, bsList: {bsList}, interferenceThreshold: {interferenceThreshold}, logDistParams: {logDistParams}, sensi: {sensi}")
+        self.nodeid = nodeid 
+        self.x, self.y = position 
+        if node_mode == 0:  # Don't use ADR algorithm
+            self.adrEnable = False
+        else:  # Use the ADR algorithm
+            self.adrEnable = True
+
+        self.info_mode = info_mode # 'no', 'partial', 'full'
+        self.bw = int(transmitParams[2])
+        self.period = float(transmitParams[9])
+        self.pTXmax = max(powSet) # max pTX
+        self.sensi = sensi
+
+        print(f"[myNode __init__] bw={self.bw}, period={self.period}, pTXmax={self.pTXmax}")
+
+        # generate proximateBS
+        self.proximateBS = self.generateProximateBS(bsList, interferenceThreshold, logDistParams)
+        # print(f"[myNode __init__] Generated proximateBS: {self.proximateBS}")
+
+        # set of actions
+        self.freqSet = freqSet
+        self.powerSet = powSet
+        self.sfSet = sfSet
+
+        self.initial = initial
+
+        # generate packet and ack
+        self.packets = self.generatePacketsToBS(transmitParams, logDistParams)
+        self.ack = {}
+
+        # measurement params
+        self.packetNumber = 0
+        self.packetsTransmitted = 0
+        self.packetsSuccessful = 0
+        self.transmitTime = 0
+        self.energy = 0
+        self.energyConsumedByThisPacket = 0  # Energy consumed for the last packet
+
+        # Parameters for operating ADR algorithm
+        self.snrHistory = []
+        self.adrAckCnt = 0
+        self.adrAckReq = 0
+        self.oldSF = 7
+        self.oldTxp = 14
+
+    def generatePacketsToBS(self, transmitParams, logDistParams):
+        packets = {}
+        for bsid, dist in self.proximateBS.items():
+            packets[bsid] = basicPacket(self.nodeid, bsid, dist, transmitParams, logDistParams, self.sensi, self.sfSet, self.freqSet, self.adrEnable)
+        print(f"[basicNode generatePacketsToBS] Packets generated: {packets}")
+        return packets
+    
+    def updateNode(self):
+        rssi = self.packets[0].pRX  # RSSI of the packet
+        noiseFloor = 6
+        snr = rssi + 174 -10*np.log10(self.bw * 1000) - noiseFloor  # The bandwidth is in kHz. So we multiply by 1000
+        self.snrHistory.append(snr)  # Store the SNR in the history
+        if len(self.snrHistory) > 20:
+            self.snrHistory.pop(0)  # Keep only the last 10 SNR values
+        self.oldSF = self.packets[0].sf
+        self.oldTxp = self.packets[0].pTX

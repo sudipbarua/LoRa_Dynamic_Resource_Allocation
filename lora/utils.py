@@ -12,7 +12,7 @@ import numpy as np
 from os.path import join, exists
 from os import makedirs
 import simpy
-from .node import myNode, rlNode, qlNode, sysOptimizerRlNode, masterAgentRlNode
+from .node import myNode, rlNode, qlNode, sysOptimizerRlNode, masterAgentRlNode, qlNodeFreqHop, basicNode
 from .bs import myBS
 from .bsFunctions import transmitPacket, cuckooClock, saveProb, saveRatio, saveEnergy, saveTraffic, savePRRlastFew, saveAvgEnergyPerPacket, saveTxParams
 from .loratools import dBmTomW, getMaxTransmitDistance, placeRandomlyInRange, placeRandomly
@@ -195,7 +195,7 @@ def sim(nrNodes, nrIntNodes, nrBS, initial, radius, distribution, avgSendTime, h
         # Common agent for all nodes
         drlAgent = AraSysOptimizerAgent(
             state_size=5,
-            action_size=len(sfSet) * len(freqSet) * len(powSet),
+            action_size=len(sfSet) * len(powSet),
             sfSet=sfSet, powSet=powSet, freqSet=freqSet
         )
     for elem in nodeList:
@@ -203,11 +203,22 @@ def sim(nrNodes, nrIntNodes, nrBS, initial, radius, distribution, avgSendTime, h
         if algo=="exp3" or algo=="exp3s":
             node = myNode(int(elem[0]), (elem[1], elem[2]), elem[3:13], initial, sfSet, freqSet, powSet,
                           BSList, interferenceThreshold, logDistParams, sensi, elem[13], info_mode, horTime, algo, simu_dir, fname)
-            nodeDict[node.nodeid] = node
-            env.process(transmitPacket(env, node, bsDict, logDistParams, algo))
+        elif algo == "basicAdr":
+            node = basicNode(int(elem[0]), (elem[1], elem[2]), transmitParams, initial, sfSet, freqSet, powSet, 
+                             BSList, interferenceThreshold, logDistParams, sensi, elem[13], info_mode, horTime, algo, simu_dir, fname)  
         else:
             if algo=="QL_ARA":
                 node = qlNode(int(elem[0]), (elem[1], elem[2]), transmitParams, initial, sfSet, freqSet, powSet,
+                            BSList, interferenceThreshold, logDistParams, sensi, elem[13], info_mode, horTime, algo, simu_dir, fname)
+                drlAgent = LoRaQLAgent(
+                    state_size=len(node.previousState),
+                    action_size=node.nrActions, 
+                    sfSet=node.sfSet, powSet=node.powerSet, 
+                    freqSet=node.freqSet,
+                    nDiscreteStates=node.nDiscreteStates
+                )
+            elif algo=="QL_momarl_freqhop":
+                node = qlNodeFreqHop(int(elem[0]), (elem[1], elem[2]), transmitParams, initial, sfSet, freqSet, powSet,
                             BSList, interferenceThreshold, logDistParams, sensi, elem[13], info_mode, horTime, algo, simu_dir, fname)
                 drlAgent = LoRaQLAgent(
                     state_size=len(node.previousState),
@@ -251,13 +262,15 @@ def sim(nrNodes, nrIntNodes, nrBS, initial, radius, distribution, avgSendTime, h
             # Now we attach the agent to the node
             node.setRlAgent(drlAgent)
             node.generatePacketsToBS(transmitParams, logDistParams)
-            # Svae nodes in the dict and schedule transmission
-            nodeDict[node.nodeid] = node
-            env.process(transmitPacket(env, node, bsDict, logDistParams, algo, erg_monitor, prr_monitor))
+        # Svae nodes in the dict and schedule transmission
+        nodeDict[node.nodeid] = node
+        env.process(transmitPacket(env, node, bsDict, logDistParams, algo, erg_monitor, prr_monitor))
     
     # save results
-    if algo == "exp3" or algo == "exp3s":
+    if algo in ("exp3", "exp3s"):
         env.process(saveProb(env, nodeDict, fname, simu_dir))
+    elif algo=='basicAdr':
+        pass
     else:
         env.process(savePRRlastFew(env, nodeDict, fname, simu_dir))
     env.process(saveTxParams(env, nodeDict, fname, simu_dir))

@@ -13,6 +13,38 @@ import random
 import numpy as np
 from os.path import join
 from .loratools import airtime, dBmTomW
+
+def nsAdrAlgorithm(sf, txpow, m_snr, tpMax, tpMin):
+    """
+    Implements the ADR algorithm for a given node.
+    Adjusts the transmission power (TxPower) and data rate (DR) based on the flowchart.
+    """
+    print("NS ADR algorithm in use.")
+    min_sf = 7  
+    snr_threshold = [-7.5, -10.0, -12.5, -15.0, -17.5, -20.0]
+    req_snr = snr_threshold[sf - 7]  # SNR threshold for the current SF
+    margin_snr = m_snr - req_snr - 10  # Margin to be added to the SNR threshold
+    nstep = margin_snr / 3
+
+    while nstep > 0 and sf > min_sf:
+        sf -= 1
+        nstep -= 1
+
+    while nstep > 0 and txpow > tpMin:
+        txpow -= 3
+        nstep -= 1
+
+    while nstep < 0 and txpow < tpMax:
+        txpow += 3
+        nstep += 1
+
+    if txpow > tpMax:
+        txpow = tpMax
+    if txpow < tpMin:
+        txpow = tpMin
+        
+    return sf, txpow
+
 # Transmit
 def transmitPacket(env, node, bsDict, logDistParams, algo, ergMonitor=None, prrMonitor=None):
     """ Transmit a packet from node to all BSs in the list.
@@ -45,6 +77,14 @@ def transmitPacket(env, node, bsDict, logDistParams, algo, ergMonitor=None, prrM
             if algo=="exp3" or algo=="exp3s": 
                 prob_temp = [node.prob[x] for x in node.prob]
                 node.packets[bsid].updateTXSettings(bsDict, logDistParams, prob_temp)
+            elif algo == "basicAdr":
+                if node.adrAckReq == 1:
+                ################# Calling the NS ADR algorithm ##################
+                    nsAdrAlgorithm(node.oldSF, node.oldTxp, node.m_snr, max(node.powerSet), min(node.powerSet))
+                node.packets[bsid].updateTXSettings(bsDict, logDistParams, node.adrAckCnt, node.oldSF, node.oldTxp)
+                node.adrAckReq = node.packets[bsid].adrAckReq
+                print('oldSF:', node.oldSF, 'oldTxp:', node.oldTxp, 'newSF:', node.packets[bsid].sf, 'newTxp:', node.packets[bsid].pTX)
+                #################################################################
             else:
                 # in case of DQN, the choice of action depends on the (previous) states 
                 # So this is where we pass the preceding state information to the agent via the packet object
@@ -78,7 +118,7 @@ def transmitPacket(env, node, bsDict, logDistParams, algo, ergMonitor=None, prrM
         
         # transmit ACK
         for bsid in node.proximateBS.keys():
-            print("[bsFunctions transmitPacket]=====> eval bs {}".format(bsid))
+            # print("[bsFunctions transmitPacket]=====> eval bs {}".format(bsid))
             if bsDict[bsid].removePacket(node.nodeid):
                 bsDict[bsid].addACK(node.nodeid, node.packets[bsid])
                 ACKrest = airtime((node.packets[0].sf, node.packets[0].rdd, node.packets[0].bw, node.packets[0].packetLength, node.packets[0].preambleLength, node.packets[0].syncLength, node.packets[0].headerEnable, node.packets[0].crc))# time until the ACK completes
@@ -88,7 +128,7 @@ def transmitPacket(env, node, bsDict, logDistParams, algo, ergMonitor=None, prrM
                 
         # update parameters        
         node.packetsTransmitted += 1
-        node.energyConsumedByThisPacket = node.packets[0].getPktAirtime() * dBmTomW(node.packets[0].pTX) * (3.0) /1e6 # V = 3.0     # voltage XXX
+        node.energyConsumedByThisPacket = node.packets[0].getPktAirtime() * dBmTomW(node.packets[0].pTX) * (3.0) /1e6 # V = 3.0    
         node.energy += node.energyConsumedByThisPacket
         # updating the overall average energy per packet by finding the mean based on the energy consumed by the incoming packet  
         ergMonitor.avgErgPerPkt = (ergMonitor.avgErgPerPkt + node.energyConsumedByThisPacket) / 2  
@@ -101,14 +141,24 @@ def transmitPacket(env, node, bsDict, logDistParams, algo, ergMonitor=None, prrM
                 prrMonitor.sysWideSuccessfulPkt += 1
                 prrMonitor.prrSys = prrMonitor.sysWideSuccessfulPkt / prrMonitor.sysWidePktTx
             elif node.info_mode == "FULL": 
-                if not node.ack[0].isCollision:
+                if not node.ack[0].isCollision:   # ack is stored in the form of the whole packet object in the dict. So here we check the isCollision attribute 
                     node.packetsSuccessful += 1
                     node.transmitTime += node.packets[0].getPktAirtime()
                     prrMonitor.sysWideSuccessfulPkt += 1
                     prrMonitor.prrSys = prrMonitor.sysWideSuccessfulPkt / prrMonitor.sysWidePktTx
             if algo=='exp3' or algo=='exp3s':
                 node.updateProb(algo)
-        if algo not in ('exp3', 'exp3s'):
+            elif algo=="basicAdr":
+                node.adrAckCnt = 0
+                node.adrAckReq = 0
+                # Like we did update agent in the RL algos or updated probability for the exp3 algo, we update the node in case of the basic ADR algo
+                # This will update the SNR history and also update the SF and TxPower value of the node   
+                node.updateNode()
+        else:
+            if algo=='basicAdr':
+                node.adrAckCnt += 1
+
+        if algo not in ('exp3', 'exp3s', 'basicAdr'):
             node.packetsTransmittedHistory.append(1)
             node.packetsSuccessfulHistory.append(1 if successfulRx else 0)
             if algo=="DDQN_sysOptim":
@@ -117,6 +167,7 @@ def transmitPacket(env, node, bsDict, logDistParams, algo, ergMonitor=None, prrM
                 node.updateAgent(prrMonitor.prrSys, ergMonitor.avgErgPerPkt, prrMonitor.sysWideSuccessfulPkt)
             else:
                 node.updateAgent()
+            
         # print("[bsFunctions transmitPacket]Probability of action from node " +str(node.nodeid)+ " at (t+1)= {}".format(int(1+env.now/(6*60*1000))))
         # print(node.prob)
         # print(node.weight)

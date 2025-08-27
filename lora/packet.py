@@ -22,7 +22,7 @@ class myPacket():
     \param [IN] prob: probability
     """
 
-    def __init__(self, nodeid, bsid, dist, transmitParams, logDistParams, sensi, setActions, nrActions, sfSet, prob): #choosenAction):
+    def __init__(self, nodeid, bsid, dist, transmitParams, logDistParams, sensi, setActions, nrActions, sfSet, prob): 
         self.nodeid = nodeid
         self.bsid = bsid
         self.dist = dist
@@ -212,5 +212,108 @@ class rlPacket(myPacket):
             self.isLost = True
             print(f"[{self.__class__.__name__} updateTXSettings] pRX", self.pRX)
             print(f"[{self.__class__.__name__} updateTXSettings] Node " + str(self.nodeid) + ": packet is lost (smaller than RSSI theshold)!")
+   
+        self.isCritical = False
+
+
+class rlPacketFreqHop(myPacket):
+    def __init__(self, nodeid, bsid, dist, transmitParams, logDistParams, sensi, setActions, nrActions, sfSet, agent, prob={'dummy': 'dummy'}):
+        super().__init__(nodeid, bsid, dist, transmitParams, logDistParams, sensi, setActions, nrActions, sfSet, prob)
+        self.agent = agent  # Reference to the RL agent from RL node    
+
+    def updateTXSettings(self, bsDict, logDistParams, state):
+        self.packetNumber += 1
+        self.chosenAction = self.agent.act(np.array(state).reshape(1, -1))  # reshaping reqired in case state is a 1D array
+        self.freq = random.choice(self.agent.channels)
+        self.sf, self.pTX = self.setActions[self.chosenAction]
+        print(f"[{self.__class__.__name__} updateTXSettings] Node " + str(self.nodeid) + " chose action: " + str(self.chosenAction) + " with SF: " + str(self.sf) + ", Freq: " + str(self.freq) + ", pTX: " + str(self.pTX))
+        self.pRX = getRXPower(self.pTX, self.dist, logDistParams)
+
+        self.signalLevel = self.computePowerDist(bsDict, logDistParams)
+
+        if self.pRX >= self.sensi[self.sf-7, 1+int(self.bw/250)]:
+            self.isLost = False
+        else:
+            self.isLost = True
+            print(f"[{self.__class__.__name__} updateTXSettings] pRX", self.pRX)
+            print(f"[{self.__class__.__name__} updateTXSettings] Node " + str(self.nodeid) + ": packet is lost (smaller than RSSI theshold)!")
+   
+        self.isCritical = False
+
+
+class basicPacket(myPacket):
+    def __init__(self, nodeid, bsid, dist, transmitParams, logDistParams, sensi, sfSet, freqSet, adrEbable): 
+        self.nodeid = nodeid
+        self.bsid = bsid
+        self.dist = dist
+        
+        # params
+        self.sf = int(transmitParams[0])
+        self.rdd = int(transmitParams[1])
+        self.bw = int(transmitParams[2])
+        self.packetLength = int(transmitParams[3])
+        self.preambleLength = int(transmitParams[4])
+        self.syncLength = transmitParams[5]
+        self.headerEnable = int(transmitParams[6])
+        self.crc = int(transmitParams[7])
+        self.pTXmax = int(transmitParams[8])
+        self.sensi = sensi
+        self.sfSet = sfSet
+        self.freqSet = freqSet
+        
+        self.sf = None
+        self.freq= None
+        self.pTX = self.pTXmax
+        
+        #received params
+        self.rectime = airtime(transmitParams[0:8])
+        self.pRX = getRXPower(self.pTX, self.dist, logDistParams)
+        self.signalLevel = None
+
+        # measurement params
+        self.packetNumber = 0
+        self.isLost = False
+        self.isCritical = False
+        self.isCollision = False
+
+        self.adrEnable = adrEbable
+        self.adrAckReq = 0
+
+    def updateTXSettings(self, bsDict, logDistParams, adrAckCnt, oldSF, oldPtx):
+        self.packetNumber += 1
+        self.freq = random.choice(self.freqSet)
+        if self.adrEnable:
+            ############ ED ADR algorithm ############
+            print("ED ADR algorithm in use.")
+            adrAckLimit = 16 
+            adrAckDelay = 8
+            if adrAckCnt >= adrAckLimit:
+                print("ADR acknowledgement limit is exceeded.")
+                if self.pTX < self.pTXmax and self.sf < max(self.sfSet):
+                    self.adrAckReq = 1
+                    if adrAckCnt > (adrAckLimit + adrAckDelay):
+                        if self.pTX < self.pTXmax:
+                            self.pTX += 2
+                        else:
+                            self.sf += 1
+                        adrAckCnt = adrAckLimit
+                else:
+                    self.pTX, self.sf = self.pTXmax, max(self.sfSet)
+            else:
+                # ADR acknowledgement limit is not exceeded so we keep the previous settings
+                self.sf, self.pTX = oldSF, oldPtx
+            ###########################################
+        else:
+            self.sf, self.pTX = random.choice(self.sfSet), self.pTXmax 
+        self.pRX = getRXPower(self.pTX, self.dist, logDistParams)
+
+        self.signalLevel = self.computePowerDist(bsDict, logDistParams)
+        print(f"[{self.__class__.__name__} updateTXSettings] Packet " + str(self.nodeid) + " Old SF: " + str(oldSF) + " Old TxPow: " + str(oldPtx) + " chose SF: " + str(self.sf) + ", pTX: " + str(self.pTX))
+        if self.pRX >= self.sensi[self.sf-7, 1+int(self.bw/250)]:
+            self.isLost = False
+        else:
+            self.isLost = True
+            print(f"[{self.__class__.__name__} updateTXSettings] pRX", self.pRX)
+            print(f"[{self.__class__.__name__} updateTXSettings] Packet " + str(self.nodeid) + ": packet is lost (smaller than RSSI theshold)!")
    
         self.isCritical = False
