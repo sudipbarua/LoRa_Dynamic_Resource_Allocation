@@ -23,7 +23,7 @@ def nsAdrAlgorithm(sf, txpow, m_snr, tpMax, tpMin):
     min_sf = 7  
     snr_threshold = [-7.5, -10.0, -12.5, -15.0, -17.5, -20.0]
     req_snr = snr_threshold[sf - 7]  # SNR threshold for the current SF
-    margin_snr = m_snr - req_snr - 10  # Margin to be added to the SNR threshold
+    margin_snr = m_snr - req_snr - 5  # 5dB Margin added to the SNR threshold
     nstep = margin_snr / 3
 
     while nstep > 0 and sf > min_sf:
@@ -31,11 +31,11 @@ def nsAdrAlgorithm(sf, txpow, m_snr, tpMax, tpMin):
         nstep -= 1
 
     while nstep > 0 and txpow > tpMin:
-        txpow -= 3
+        txpow -= 2
         nstep -= 1
 
     while nstep < 0 and txpow < tpMax:
-        txpow += 3
+        txpow += 2
         nstep += 1
 
     if txpow > tpMax:
@@ -78,12 +78,17 @@ def transmitPacket(env, node, bsDict, logDistParams, algo, ergMonitor=None, prrM
                 prob_temp = [node.prob[x] for x in node.prob]
                 node.packets[bsid].updateTXSettings(bsDict, logDistParams, prob_temp)
             elif algo == "basicAdr":
-                if node.adrAckReq == 1:
+                if len(node.snrHistory) > 10:  # wait until 10 packets have been sent
                 ################# Calling the NS ADR algorithm ##################
-                    nsAdrAlgorithm(node.oldSF, node.oldTxp, node.m_snr, max(node.powerSet), min(node.powerSet))
-                node.packets[bsid].updateTXSettings(bsDict, logDistParams, node.adrAckCnt, node.oldSF, node.oldTxp)
+                    m_snr = np.max(node.snrHistory) 
+                    node.sf, node.txp = nsAdrAlgorithm(node.sf, node.txp, m_snr, max(node.powerSet), min(node.powerSet))
+                elif node.adrAckReq == 1:
+                    # setting to the worst case scenario
+                    node.sf, node.txp =  max(node.sfSet), max(node.powerSet)
+                
+                node.packets[bsid].updateTXSettings(bsDict, logDistParams, node.adrAckCnt, node.sf, node.txp)
                 node.adrAckReq = node.packets[bsid].adrAckReq
-                print('oldSF:', node.oldSF, 'oldTxp:', node.oldTxp, 'newSF:', node.packets[bsid].sf, 'newTxp:', node.packets[bsid].pTX)
+                print('sf:', node.sf, 'txp:', node.txp, 'newSF:', node.packets[bsid].sf, 'newTxp:', node.packets[bsid].pTX)
                 #################################################################
             else:
                 # in case of DQN, the choice of action depends on the (previous) states 
@@ -264,7 +269,7 @@ def saveTxParams(env, nodeDict, fname, simu_dir):
     if not os.path.exists(txParamDir):
         os.makedirs(txParamDir)
     while True:
-        yield env.timeout(100 * 3600000)
+        yield env.timeout(24 * 3600000)
         # write tx params to file
         for nodeid in nodeDict.keys():
             filename = join(txParamDir, str('txParams_'+ fname) + '_id_' + str(nodeid) + '.csv')

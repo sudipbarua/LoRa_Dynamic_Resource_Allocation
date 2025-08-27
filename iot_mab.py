@@ -45,8 +45,8 @@ if __name__ == '__main__':
     # # print args and run simulation
 
     args = SimpleNamespace(
-        nrNodes=500,
-        nrIntNodes=500,
+        nrNodes=100,
+        nrIntNodes=100,
         nrBS=1,
         initial='UNIFORM',
         radius=4500,
@@ -66,7 +66,7 @@ if __name__ == '__main__':
         interSFInterference=1,
         infoMode='FULL',  # NO, PARTIAL, FULL
         Algo='basicAdr',  # exp3, exp3s, DDQN_LORADRL, DDQN_ARA, QL_ARA, DQN_ARA, DDQN_sysOptim, basicAdr
-        exp_name='test',
+        exp_name='basicAdr_test',
         logdir='./all_experiments'
     )
     main(args)

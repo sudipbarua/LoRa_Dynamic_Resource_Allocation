@@ -756,8 +756,8 @@ class basicNode(myNode):
         self.snrHistory = []
         self.adrAckCnt = 0
         self.adrAckReq = 0
-        self.oldSF = 7
-        self.oldTxp = 14
+        self.sf = 12
+        self.txp = 14
 
     def generatePacketsToBS(self, transmitParams, logDistParams):
         packets = {}
@@ -773,5 +773,5 @@ class basicNode(myNode):
         self.snrHistory.append(snr)  # Store the SNR in the history
         if len(self.snrHistory) > 20:
             self.snrHistory.pop(0)  # Keep only the last 10 SNR values
-        self.oldSF = self.packets[0].sf
-        self.oldTxp = self.packets[0].pTX
+        self.sf = self.packets[0].sf
+        self.txp = self.packets[0].pTX
