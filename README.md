@@ -124,10 +124,11 @@ $$
 - QL_ARA: Q learning based multi-objective and multi-agent algorithm
 
 - DDQN_sysOptim: A single agent ADR algorithm with systemwide optimization
-    $$
-    Reward_{MoMARL_{sysOptim}} = \frac{\alpha \cdot PRR_{\text{sys}} \cdot \text{int}(! pktLost)}
-     {\beta \cdot AvgEnergyPerPkt}
-    $$
+
+$$
+Reward_{MoMARL_{sysOptim}} = \frac{\alpha \cdot PRR_{\text{sys}} \cdot \text{int}(! pktLost)}
+ {\beta \cdot AvgEnergyPerPkt}
+$$
 
 **logdir**
 
@@ -188,12 +189,15 @@ The data file is then plotted into .png file by using matplotlib.
 
 **Figure 1: Packet Reception Ratio (PRR) Comparison**
 ![alt text](image-1.png)
+
 Comparison of packet reception ratios across different algorithms. Shows how well each resource allocation strategy achieves the primary objective of maximizing network PRR.
 
 **Figure 2: Energy Consumption Analysis**
 ![alt text](image-2.png)
+
 Energy consumption per packet across different algorithms. Demonstrates the trade-off between PRR optimization and power efficiency for each allocation strategy.
 
 **Figure 3: Throughput and Fairness Metrics**
 ![alt text](image-3.png)
+
 Normalized traffic and throughput performance across algorithms. Illustrates the overall network efficiency and how each algorithm balances load distribution among nodes.
