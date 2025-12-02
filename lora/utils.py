@@ -12,11 +12,27 @@ import numpy as np
 from os.path import join, exists
 from os import makedirs
 import simpy
-from .node import myNode, rlNode
+from .node import myNode, rlNode, qlNode, sysOptimizerRlNode, masterAgentRlNode, qlNodeFreqHop, basicNode
 from .bs import myBS
-from .bsFunctions import transmitPacket, cuckooClock, saveProb, saveRatio, saveEnergy, saveTraffic, savePRRlastFew
+from .bsFunctions import transmitPacket, cuckooClock, saveProb, saveRatio, saveEnergy, saveTraffic, savePRRlastFew, saveAvgEnergyPerPacket, saveTxParams
 from .loratools import dBmTomW, getMaxTransmitDistance, placeRandomlyInRange, placeRandomly
 from .plotting import plotLocations
+from .Agent import LoRaDRL, AdaptiveResourceAllocation, LoRaQLAgent, DQNAgent, AraSysOptimizerAgent
+
+
+class EnergyMonitor():
+    # Energy monitor for the overall system
+    def __init__(self):
+        self.avgErgPerPkt = 0.01
+
+
+class PrrMonitor():
+    # Packet reception monitor for the overall system
+    def __init__(self):
+        self.prrSys = 0  # Packet Reception Ratio of the system
+        self.sysWidePktTx = 0
+        self.sysWideSuccessfulPkt = 0
+
 
 def print_params(nrNodes, nrIntNodes, nrBS, initial, radius, distribution, avgSendTime, horTime, packetLength, sfSet, freqSet, powSet, captureEffect, interSFInterference, info_mode, algo):
     # print parametters
@@ -37,7 +53,8 @@ def print_params(nrNodes, nrIntNodes, nrBS, initial, radius, distribution, avgSe
     print ("\t Inter-SF Interference:",interSFInterference)
     print ("\t Information mode:",info_mode)
     print ("\t Learning algorithm:", algo)
-        
+
+
 def sim(nrNodes, nrIntNodes, nrBS, initial, radius, distribution, avgSendTime, horTime, packetLength, sfSet, freqSet, 
         powSet, captureEffect, interSFInterference, info_mode, algo, logdir, exp_name) :
     
@@ -169,25 +186,98 @@ def sim(nrNodes, nrIntNodes, nrBS, initial, radius, distribution, avgSendTime, h
     for elem in BSList:
         bsDict[int(elem[0])] = myBS(int(elem[0]), (elem[1], elem[2]), interactionMatrix, nDemodulator, ackLength, freqSet, sfSet, captureThreshold)
         
+    # Total (Sysrem-wide) energy conumption and system-wide PRR monitor
+    erg_monitor = EnergyMonitor()
+    prr_monitor = PrrMonitor()
+
     nodeDict = {} # setup empty dictionary for nodes
+    if algo=="masterAgent":
+        # Common agent for all nodes
+        drlAgent = AraSysOptimizerAgent(
+            state_size=5,
+            action_size=len(sfSet) * len(powSet),
+            sfSet=sfSet, powSet=powSet, freqSet=freqSet
+        )
     for elem in nodeList:
+        transmitParams = elem[3:13]
         if algo=="exp3" or algo=="exp3s":
             node = myNode(int(elem[0]), (elem[1], elem[2]), elem[3:13], initial, sfSet, freqSet, powSet,
                           BSList, interferenceThreshold, logDistParams, sensi, elem[13], info_mode, horTime, algo, simu_dir, fname)
-        elif algo=="DDQN_LORADRL" or algo=="DDQN_ARA":
-            node = rlNode(int(elem[0]), (elem[1], elem[2]), elem[3:13], initial, sfSet, freqSet, powSet,
-                          BSList, interferenceThreshold, logDistParams, sensi, elem[13], info_mode, horTime, algo, simu_dir, fname)
+        elif algo == "basicAdr":
+            node = basicNode(int(elem[0]), (elem[1], elem[2]), transmitParams, initial, sfSet, freqSet, powSet, 
+                             BSList, interferenceThreshold, logDistParams, sensi, elem[13], info_mode, horTime, algo, simu_dir, fname)  
+        else:
+            if algo=="QL_ARA":
+                node = qlNode(int(elem[0]), (elem[1], elem[2]), transmitParams, initial, sfSet, freqSet, powSet,
+                            BSList, interferenceThreshold, logDistParams, sensi, elem[13], info_mode, horTime, algo, simu_dir, fname)
+                drlAgent = LoRaQLAgent(
+                    state_size=len(node.previousState),
+                    action_size=node.nrActions, 
+                    sfSet=node.sfSet, powSet=node.powerSet, 
+                    freqSet=node.freqSet,
+                    nDiscreteStates=node.nDiscreteStates
+                )
+            elif algo=="QL_momarl_freqhop":
+                node = qlNodeFreqHop(int(elem[0]), (elem[1], elem[2]), transmitParams, initial, sfSet, freqSet, powSet,
+                            BSList, interferenceThreshold, logDistParams, sensi, elem[13], info_mode, horTime, algo, simu_dir, fname)
+                drlAgent = LoRaQLAgent(
+                    state_size=len(node.previousState),
+                    action_size=node.nrActions, 
+                    sfSet=node.sfSet, powSet=node.powerSet, 
+                    freqSet=node.freqSet,
+                    nDiscreteStates=node.nDiscreteStates
+                )
+            elif algo=="DDQN_sysOptim":
+                node = sysOptimizerRlNode(int(elem[0]), (elem[1], elem[2]), transmitParams, initial, sfSet, freqSet, powSet,
+                            BSList, interferenceThreshold, logDistParams, sensi, elem[13], info_mode, horTime, algo, simu_dir, fname)
+                drlAgent = AraSysOptimizerAgent(
+                    state_size=len(node.previousState),
+                    action_size=node.nrActions, 
+                    sfSet=node.sfSet, powSet=node.powerSet, 
+                    freqSet=node.freqSet
+                )
+
+            elif algo=="masterAgent":
+                node = masterAgentRlNode(int(elem[0]), (elem[1], elem[2]), transmitParams, initial, sfSet, freqSet, powSet,
+                            BSList, interferenceThreshold, logDistParams, sensi, elem[13], info_mode, horTime, algo, simu_dir, fname)
+        
+            else: 
+                node = rlNode(int(elem[0]), (elem[1], elem[2]), transmitParams, initial, sfSet, freqSet, powSet,
+                            BSList, interferenceThreshold, logDistParams, sensi, elem[13], info_mode, horTime, algo, simu_dir, fname)
+                if algo=="DDQN_LORADRL":
+                    drlAgent = LoRaDRL(state_size=len(node.previousState),
+                                       action_size=node.nrActions, 
+                                       sfSet=node.sfSet, powSet=node.powerSet, 
+                                       freqSet=node.freqSet) 
+                elif algo=="DDQN_ARA":
+                    drlAgent = AdaptiveResourceAllocation(state_size=len(node.previousState), 
+                                                          action_size=node.nrActions, 
+                                                          sfSet=node.sfSet, powSet=node.powerSet, 
+                                                          freqSet=node.freqSet)
+                elif algo=="DQN_ARA":
+                    drlAgent = DQNAgent(state_size=len(node.previousState),
+                                       action_size=node.nrActions, 
+                                       sfSet=node.sfSet, powSet=node.powerSet, 
+                                       freqSet=node.freqSet)
+            # Now we attach the agent to the node
+            node.setRlAgent(drlAgent)
+            node.generatePacketsToBS(transmitParams, logDistParams)
+        # Svae nodes in the dict and schedule transmission
         nodeDict[node.nodeid] = node
-        env.process(transmitPacket(env, node, bsDict, logDistParams, algo))
+        env.process(transmitPacket(env, node, bsDict, logDistParams, algo, erg_monitor, prr_monitor))
     
     # save results
-    if algo == "exp3" or algo == "exp3s":
+    if algo in ("exp3", "exp3s"):
         env.process(saveProb(env, nodeDict, fname, simu_dir))
+    elif algo=='basicAdr':
+        pass
+    else:
+        env.process(savePRRlastFew(env, nodeDict, fname, simu_dir))
+    env.process(saveTxParams(env, nodeDict, fname, simu_dir))
+    env.process(saveAvgEnergyPerPacket(env, erg_monitor, fname, simu_dir))
     env.process(saveRatio(env, nodeDict, fname, simu_dir))
     env.process(saveEnergy(env, nodeDict, fname, simu_dir))
     env.process(saveTraffic(env, nodeDict, fname, simu_dir, sfSet, freqSet, lambda_i, lambda_e))
-    if algo == "DDQN_LORADRL" or algo == "DDQN_ARA":
-        env.process(savePRRlastFew(env, nodeDict, fname, simu_dir))
     
     env.run(until=simtime)
     

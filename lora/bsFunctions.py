@@ -13,8 +13,40 @@ import random
 import numpy as np
 from os.path import join
 from .loratools import airtime, dBmTomW
+
+def nsAdrAlgorithm(sf, txpow, m_snr, tpMax, tpMin):
+    """
+    Implements the ADR algorithm for a given node.
+    Adjusts the transmission power (TxPower) and data rate (DR) based on the flowchart.
+    """
+    print("NS ADR algorithm in use.")
+    min_sf = 7  
+    snr_threshold = [-7.5, -10.0, -12.5, -15.0, -17.5, -20.0]
+    req_snr = snr_threshold[sf - 7]  # SNR threshold for the current SF
+    margin_snr = m_snr - req_snr - 5  # 5dB Margin added to the SNR threshold
+    nstep = margin_snr / 3
+
+    while nstep > 0 and sf > min_sf:
+        sf -= 1
+        nstep -= 1
+
+    while nstep > 0 and txpow > tpMin:
+        txpow -= 2
+        nstep -= 1
+
+    while nstep < 0 and txpow < tpMax:
+        txpow += 2
+        nstep += 1
+
+    if txpow > tpMax:
+        txpow = tpMax
+    if txpow < tpMin:
+        txpow = tpMin
+        
+    return sf, txpow
+
 # Transmit
-def transmitPacket(env, node, bsDict, logDistParams, algo):
+def transmitPacket(env, node, bsDict, logDistParams, algo, ergMonitor=None, prrMonitor=None):
     """ Transmit a packet from node to all BSs in the list.
     Parameters
     ----------
@@ -45,7 +77,20 @@ def transmitPacket(env, node, bsDict, logDistParams, algo):
             if algo=="exp3" or algo=="exp3s": 
                 prob_temp = [node.prob[x] for x in node.prob]
                 node.packets[bsid].updateTXSettings(bsDict, logDistParams, prob_temp)
-            elif algo=="DDQN_LORADRL" or algo=="DDQN_ARA":
+            elif algo == "basicAdr":
+                if len(node.snrHistory) > 10:  # wait until 10 packets have been sent
+                ################# Calling the NS ADR algorithm ##################
+                    m_snr = np.max(node.snrHistory) 
+                    node.sf, node.txp = nsAdrAlgorithm(node.sf, node.txp, m_snr, max(node.powerSet), min(node.powerSet))
+                elif node.adrAckReq == 1:
+                    # setting to the worst case scenario
+                    node.sf, node.txp =  max(node.sfSet), max(node.powerSet)
+                
+                node.packets[bsid].updateTXSettings(bsDict, logDistParams, node.adrAckCnt, node.sf, node.txp)
+                node.adrAckReq = node.packets[bsid].adrAckReq
+                print('sf:', node.sf, 'txp:', node.txp, 'newSF:', node.packets[bsid].sf, 'newTxp:', node.packets[bsid].pTX)
+                #################################################################
+            else:
                 # in case of DQN, the choice of action depends on the (previous) states 
                 # So this is where we pass the preceding state information to the agent via the packet object
                 node.packets[bsid].updateTXSettings(bsDict, logDistParams, node.previousState)
@@ -78,7 +123,7 @@ def transmitPacket(env, node, bsDict, logDistParams, algo):
         
         # transmit ACK
         for bsid in node.proximateBS.keys():
-            print("[bsFunctions transmitPacket]=====> eval bs {}".format(bsid))
+            # print("[bsFunctions transmitPacket]=====> eval bs {}".format(bsid))
             if bsDict[bsid].removePacket(node.nodeid):
                 bsDict[bsid].addACK(node.nodeid, node.packets[bsid])
                 ACKrest = airtime((node.packets[0].sf, node.packets[0].rdd, node.packets[0].bw, node.packets[0].packetLength, node.packets[0].preambleLength, node.packets[0].syncLength, node.packets[0].headerEnable, node.packets[0].crc))# time until the ACK completes
@@ -86,24 +131,48 @@ def transmitPacket(env, node, bsDict, logDistParams, algo):
                 node.addACK(bsDict[bsid].bsid, node.packets[bsid])
                 successfulRx = True
                 
-        # update probability        
+        # update parameters        
         node.packetsTransmitted += 1
-        node.energyConsumedByThisPacket = node.packets[0].rectime * dBmTomW(node.packets[0].pTX) * (3.0) /1e6 # V = 3.0     # voltage XXX
+        node.energyConsumedByThisPacket = node.packets[0].getPktAirtime() * dBmTomW(node.packets[0].pTX) * (3.0) /1e6 # V = 3.0    
         node.energy += node.energyConsumedByThisPacket
+        # updating the overall average energy per packet by finding the mean based on the energy consumed by the incoming packet  
+        ergMonitor.avgErgPerPkt = (ergMonitor.avgErgPerPkt + node.energyConsumedByThisPacket) / 2  
+        prrMonitor.sysWidePktTx += 1
+
         if successfulRx:
             if node.info_mode in ["NO", "PARTIAL"]:
                 node.packetsSuccessful += 1
-                node.transmitTime += node.packets[0].rectime
+                node.transmitTime += node.packets[0].getPktAirtime()
+                prrMonitor.sysWideSuccessfulPkt += 1
+                prrMonitor.prrSys = prrMonitor.sysWideSuccessfulPkt / prrMonitor.sysWidePktTx
             elif node.info_mode == "FULL": 
-                if not node.ack[0].isCollision:
+                if not node.ack[0].isCollision:   # ack is stored in the form of the whole packet object in the dict. So here we check the isCollision attribute 
                     node.packetsSuccessful += 1
-                    node.transmitTime += node.packets[0].rectime
+                    node.transmitTime += node.packets[0].getPktAirtime()
+                    prrMonitor.sysWideSuccessfulPkt += 1
+                    prrMonitor.prrSys = prrMonitor.sysWideSuccessfulPkt / prrMonitor.sysWidePktTx
             if algo=='exp3' or algo=='exp3s':
                 node.updateProb(algo)
-        if algo=='DDQN_LORADRL' or algo=='DDQN_ARA':
+            elif algo=="basicAdr":
+                node.adrAckCnt = 0
+                node.adrAckReq = 0
+                # Like we did update agent in the RL algos or updated probability for the exp3 algo, we update the node in case of the basic ADR algo
+                # This will update the SNR history and also update the SF and TxPower value of the node   
+                node.updateNode()
+        else:
+            if algo=='basicAdr':
+                node.adrAckCnt += 1
+
+        if algo not in ('exp3', 'exp3s', 'basicAdr'):
             node.packetsTransmittedHistory.append(1)
             node.packetsSuccessfulHistory.append(1 if successfulRx else 0)
-            node.updateAgent()
+            if algo=="DDQN_sysOptim":
+                node.updateAgent(prrMonitor.prrSys, ergMonitor.avgErgPerPkt)
+            elif algo=="masterAgent":
+                node.updateAgent(prrMonitor.prrSys, ergMonitor.avgErgPerPkt, prrMonitor.sysWideSuccessfulPkt)
+            else:
+                node.updateAgent()
+            
         # print("[bsFunctions transmitPacket]Probability of action from node " +str(node.nodeid)+ " at (t+1)= {}".format(int(1+env.now/(6*60*1000))))
         # print(node.prob)
         # print(node.weight)
@@ -123,6 +192,33 @@ def cuckooClock(env):
     while True:
         yield env.timeout(1000 * 3600000)
         print("Running {} kHrs".format(env.now/(1000 * 3600000)))
+
+def saveAvgEnergyPerPacket(env, ergMonitor, fname, simu_dir):
+    """ Save average energy per packet to file
+    Parameters
+    ----------
+    env : simpy environement
+        Simulation environment.
+    ergMonitor: ergMonitor
+        Energy monitor object.
+    fname: string
+        file name structure
+    simu_dir: string
+        folder
+    Returns
+    -------
+    """
+    while True:
+        yield env.timeout(100 * 3600000)
+        # write average energy per packet to file
+        filename = join(simu_dir, str('avgEnergyPerPacket_'+ fname) + '.csv')
+        if os.path.isfile(filename):
+            res = "\n" + str(ergMonitor.avgErgPerPkt)
+        else:
+            res = str(ergMonitor.avgErgPerPkt)
+        with open(filename, "a") as myfile:
+            myfile.write(res)
+        myfile.close()
 
 def saveProb(env, nodeDict, fname, simu_dir):
     """ Save probabilities every to file
@@ -153,6 +249,38 @@ def saveProb(env, nodeDict, fname, simu_dir):
                 with open(filename, "a") as myfile:
                     myfile.write(res)
                 myfile.close()
+
+def saveTxParams(env, nodeDict, fname, simu_dir):
+    """ Save transmission parameters to file
+    Parameters
+    ----------
+    env : simpy environement
+        Simulation environment.
+    nodeDict:dict
+        list of nodes.
+    fname: string
+        file name structure
+    simu_dir: string
+        folder
+    Returns
+    -------
+    """
+    txParamDir = join(simu_dir, "txParams")
+    if not os.path.exists(txParamDir):
+        os.makedirs(txParamDir)
+    while True:
+        yield env.timeout(24 * 3600000)
+        # write tx params to file
+        for nodeid in nodeDict.keys():
+            filename = join(txParamDir, str('txParams_'+ fname) + '_id_' + str(nodeid) + '.csv')
+            save = str(nodeid) + " " + str(nodeDict[nodeid].packets[0].dist) + " " + str(nodeDict[nodeid].packets[0].sf) + " " + str(nodeDict[nodeid].packets[0].freq) + " " + str(nodeDict[nodeid].packets[0].pTX)
+            if os.path.isfile(filename):
+                res = "\n" + save
+            else:
+                res = save
+            with open(filename, "a") as myfile:
+                myfile.write(res)
+            myfile.close()
 
 def savePRRlastFew(env, nodeDict, fname, simu_dir):
     """ Save packet reception ratio of last 100 or 1000 packets 
