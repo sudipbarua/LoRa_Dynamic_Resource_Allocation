@@ -160,6 +160,9 @@ The data file is then plotted into .png file by using matplotlib.
 - **RL packet classes**: Added packet types in `lora/packet.py` (for example, `RLPacket`) that carry additional metadata required for learning, such as reward flags, episode IDs, and transmission features used for agent observations.
 - **Where to look**: See `lora/Agent.py`, `lora/node.py`, and `lora/packet.py` for implementation details and examples of how agents interact with the simulator.
 
+<img width="681" height="505" alt="image" src="https://github.com/user-attachments/assets/0b2ff748-7f8e-4934-9eb1-ee3800bb585a" />
+
+
 ## Experiment and Intermediary Results
 
 **Objectives**
